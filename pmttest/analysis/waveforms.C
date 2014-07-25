@@ -5,17 +5,8 @@
 using namespace::std;
 
 void waveforms(){
-  // write something on the screen
-
-  //created the channel object
-  //loading data and pedestals
-
-  //plot a few channels, waiting some time between them
-
-  //plot the pulse height distribution
-
-
-
+  TH1F* h=pulseheight("data24/2/950V tune 0%.txt","data24/2/pedestal 850V.txt");
+  h->Write("ph1.root");
 }
 
 class channel{
