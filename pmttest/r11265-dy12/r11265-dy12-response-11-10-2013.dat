@@ -1,0 +1,75 @@
+# r11265-M64 . 11-10-2013
+# input from pulse generator triangle wave, rise time 2mus, fall time 4ns, 
+#     amplitude 0.5V, amplitude measured withprobe xxx
+# No termination 50Ohm resistance on the pcb since 
+# termination is already present in the reistor chain
+# Signal measured on oscilloscope averagin a window of 6ns
+# signal shape similar to pmt signal, but slightly shorter signal tfall=~50ns
+#
+# added pins on the pcb to guarantee a better contact
+#
+pedestal 8.3
+31.04
+33.68
+33.38
+33.54
+32.03
+32.06
+33.43
+30.75
+29.11
+31.19
+32.47
+31.60
+32.49
+32.10
+31.24
+29.29
+20.30
+30.73
+32.22
+30.88
+30.97
+31.85
+31.30
+29.27
+25.45
+27.50
+27.50
+29.92
+27.12
+25.50
+25.23
+23.72
+25.67
+30.55
+30.11
+29.15
+26.42
+26.15
+25.38
+24.02
+33.23
+37.11
+38.35
+37.02
+36.94
+36.99
+34.98
+28.15
+36.80
+40.84
+43.85
+41.28
+41.91
+36.38
+35.50
+31.34
+38.7
+44.1
+39.7
+46.3
+47.6
+46.7
+57.21
+42.62

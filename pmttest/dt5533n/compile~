@@ -1,0 +1,3 @@
+ g++ -D UNIX -Wall main.c dt5533.cc -I/home/simi/CAEN/VME/common/include/ -I./CAENHVWrapper-5.56/include/  -lcaenhvwrapper -o test-dt553
+
+#g++ -D UNIX -Wall main.c dt5533.cc -I./CAENHVWrapper-5.56/include/  -lcaenhvwrapper -o test-dt553
