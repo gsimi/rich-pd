@@ -2,12 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include "TH1F.h"
+#include "TFile.h"
 using namespace::std;
-
-void waveforms(){
-  TH1F* h=pulseheight("data24/2/950V tune 0%.txt","data24/2/pedestal 850V.txt");
-  h->Write("ph1.root");
-}
 
 class channel{
 public:
@@ -231,22 +227,25 @@ TH1F* pulseheight(char * fdata="data/wave.01_1.txt",
   channel *ch=new channel(fdata,fpedestals,10000);
   //TH1F *h= new TH1F("ph","pulse_height",100,-100,30000);
   TH1F *h= new TH1F("ph","pulse_height",250,0,200);
-  //  for (int i=0;i<1000;i++){
   int ievent=0;
   while (!(ch->eof())){
     ch->loadNextEvent();
     ievent++;
-    //    cout<<ievent<<endl;
     if (ievent%1000==0) cout<<".";
-    //    double integr=ch->integral();
     double integr=ch->integral2();
-    //    double integr=ch->maxval();
-    //double integr=ch->smoothmax();
     h->Fill(integr,1);
-    //    cout<<i<<"."<<integr<<endl;
   }
   cout<<endl;
   h->Draw();
   return h;
 }
 
+
+
+
+void waveforms(){
+  TH1F* h=pulseheight("data24/2/950V tune 0%.txt","data24/2/pedestal 850V.txt");
+  TFile f("ph.root","update");
+  h->Write("ph1");
+  f.Close();
+}
