@@ -7,9 +7,9 @@ using namespace::std;
 
 class channel{
 public:
-  channel(char* f="data/wave_1.txt", char* p="pedestals/wave_1.txt",int npedestals=0);
+  channel(const char* f="data/wave_1.txt", const char* p="pedestals/wave_1.txt",int npedestals=0);
   // ~channel(){if (pedestals!=0) delete pedestals; waves.close();}
-  void loadPedestals(char* pedestalFile="pedestals/wave_1.txt", int npedestals=0);
+  void loadPedestals(const char* pedestalFile="pedestals/wave_1.txt", int npedestals=0);
   void loadNextEvent();
   void loadEvent(int index=0);
   //functions return ownershi to the user
@@ -31,20 +31,21 @@ private:
   //data members
   int rlength;
   double *pedestals;
-  double *raw;
+  double *rawval;
+  double *calibval;
   double *t;
-  double *values;
-  char* fname;
+  const char* fname;
   bool calibrated;
   ifstream waves;
 };
-channel::channel(char* f, char *p, int npedestals){
+channel::channel(const char* f, const char *p, int npedestals){
   rlength=1024;
   //initialize arrays
   pedestals=new double[rlength];
-  raw=new double[rlength];
-  values=raw;
+  rawval=new double[rlength];
+  calibval=new double[rlength];
   t=new double[rlength];
+  for (int i=0;i<rlength;i++){t[i]=i;}
   fname=f;
   calibrated=false;
   loadPedestals(p,npedestals);
@@ -54,7 +55,7 @@ channel::channel(char* f, char *p, int npedestals){
 void channel::loadNextEvent(){
   if (!waves.good()){cout<<"error opening file"<<endl; return;}
   for (int i=0;i<rlength;i++){
-    waves>>raw[i];
+    waves>>rawval[i];
     //debug
     //    cout<<" record" << i<<endl;
     if(waves.eof()) {
@@ -64,8 +65,6 @@ void channel::loadNextEvent(){
       }
       break;
     }
-
-    t[i]=i;
   }
   calibrate();
   calibrated=true;
@@ -80,8 +79,7 @@ void channel::loadEvent(int index){
   
   for (int i=0;i<rlength;i++){
     if(tmpwaves.eof()) continue;
-    tmpwaves>>raw[i];
-    t[i]=i;
+    tmpwaves>>rawval[i];
   }
   calibrate();
   calibrated=true;
@@ -94,7 +92,7 @@ TGraph* channel::plot(int index){
 }
 
 TGraph* channel::plot(){
-  TGraph *g=new TGraph(rlength,t,values);
+  TGraph *g=new TGraph(rlength,t,calibval);
   g->Draw("APL");
   return g;
 }
@@ -105,7 +103,7 @@ TGraph* channel::plotNext(){
 }
 
 TGraph* channel::plotRaw(){
-  TGraph *g=new TGraph(rlength,t,raw);
+  TGraph *g=new TGraph(rlength,t,rawval);
   g->Draw("APL");
   return g;
 }
@@ -118,7 +116,7 @@ TGraph* channel::plotPedestal(){
 
 
 
-void channel::loadPedestals(char* pedestalfilename, int npedestals){
+void channel::loadPedestals(const char* pedestalfilename, int npedestals){
   for(int i=0;i<rlength;i++){pedestals[i]=0;}
   ifstream pedestalsfile(pedestalfilename);
   double dummy;
@@ -143,7 +141,7 @@ void channel::loadPedestals(char* pedestalfilename, int npedestals){
       
     }//end wave
     nwaves++;
-    if (iline%1024){cout<<"error: wave "<<nwaves<<" has "<<iline<<" records"<<endl;}
+    if (iline%rlength){cout<<"error: wave "<<nwaves<<" has "<<iline<<" records"<<endl;}
     iline=0;
     
   }  
@@ -152,10 +150,8 @@ void channel::loadPedestals(char* pedestalfilename, int npedestals){
 }
 
 void channel::calibrate(){
-  double *calibch=new double[rlength];
   for(int i=0;i<rlength;i++)
-    calibch[i]=raw[i]-pedestals[i];
-  values=calibch;
+    calibval[i]=rawval[i]-pedestals[i];
   calibrated=true;
 }
 
@@ -165,7 +161,7 @@ double channel::integral(){
     return 0;
   }
   double sum=0;
-  for (int i=0;i<rlength;i++) sum+=values[i];
+  for (int i=0;i<rlength;i++) sum+=calibval[i];
   return sum;
 }
 
@@ -176,8 +172,8 @@ double channel::integral2(){
   }
   double sumbkg=0,sumsig=0;
   int bkgmax=350; int sigmin=bkgmax; int sigmax=800;
-  for (int i=0;i<bkgmax;i++) sumbkg+=values[i];
-  for (int i=sigmin;i<sigmax;i++) sumsig+=values[i];
+  for (int i=0;i<bkgmax;i++) sumbkg+=calibval[i];
+  for (int i=sigmin;i<sigmax;i++) sumsig+=calibval[i];
   sumsig-=sumbkg*(sigmax-sigmin)/bkgmax;
   sumsig=sumsig/(sigmax-sigmin);
   return sumsig;
@@ -191,10 +187,10 @@ double channel::maxval(){
     return 0;
   }
   double bkg=0,max=0;
-  int bkgmax=350; int sigmin=bkgmax; int sigmax=1004;
-  for (int i=0;i<bkgmax;i++) bkg+=values[i];
+  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;
+  for (int i=0;i<bkgmax;i++) bkg+=calibval[i];
   bkg=bkg/bkgmax;
-  for (int i=sigmin;i<sigmax;i++) {if (values[i]>max) max=values[i];}
+  for (int i=sigmin;i<sigmax;i++) {if (calibval[i]>max) max=calibval[i];}
   /* note : names are terrible: fix them */
   return max-bkg;
 }
@@ -206,12 +202,12 @@ double channel::smoothmax(int nchannels){
     return 0;
   }
   double bkg=0,max=0;
-  int bkgmax=350; int sigmin=bkgmax; int sigmax=1004;
-  for (int i=0;i<bkgmax;i++) bkg+=values[i];
+  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;
+  for (int i=0;i<bkgmax;i++) bkg+=calibval[i];
   bkg=bkg/bkgmax;
   for (int i=sigmin;i<sigmax-nchannels;i++) {
     double average=0;
-    for (int j=0;j<nchannels;j++){average+=values[i+j];}
+    for (int j=0;j<nchannels;j++){average+=calibval[i+j];}
     average=average/nchannels;
     if (average>max) max=average;}
   /* note : names are terrible: fix them */
@@ -222,8 +218,8 @@ double channel::smoothmax(int nchannels){
 
 
 
-TH1F* pulseheight(char * fdata="data/wave.01_1.txt", 
-		  char* fpedestals="pedestals/pedestal.01_1.txt"){
+TH1F* pulseheight(const char * fdata="data/wave.01_1.txt", 
+		  const char* fpedestals="pedestals/pedestal.01_1.txt"){
   channel *ch=new channel(fdata,fpedestals,10000);
   //TH1F *h= new TH1F("ph","pulse_height",100,-100,30000);
   TH1F *h= new TH1F("ph","pulse_height",250,0,200);
@@ -231,7 +227,7 @@ TH1F* pulseheight(char * fdata="data/wave.01_1.txt",
   while (!(ch->eof())){
     ch->loadNextEvent();
     ievent++;
-    if (ievent%1000==0) cout<<".";
+    if (ievent%10000==0) cout<<"."<<flush;
     double integr=ch->integral2();
     h->Fill(integr,1);
   }
