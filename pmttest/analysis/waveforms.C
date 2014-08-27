@@ -23,39 +23,64 @@ public:
   double integral2();
   double maxval();
   double smoothmax(int nchannels=4);
-
   bool eof(){return waves.eof();};
+  bool isbinary(const char *fname);
+  void readfloat(ifstream &is, float& val, bool binary);
 private:
   //private functions
   void calibrate();
   //data members
   int rlength;
-  double *pedestals;
-  double *rawval;
-  double *calibval;
-  double *t;
+  float *pedestals;
+  float *rawval;
+  float *calibval;
+  float *t;
   const char* fname;
   bool calibrated;
   ifstream waves;
+  bool binaryfile;
 };
 channel::channel(const char* f, const char *p, int npedestals){
   rlength=1024;
   //initialize arrays
-  pedestals=new double[rlength];
-  rawval=new double[rlength];
-  calibval=new double[rlength];
-  t=new double[rlength];
+  pedestals=new float[rlength];
+  rawval=new float[rlength];
+  calibval=new float[rlength];
+  t=new float[rlength];
   for (int i=0;i<rlength;i++){t[i]=i;}
   fname=f;
   calibrated=false;
   loadPedestals(p,npedestals);
-  waves.open(fname);
+  if (isbinary(fname)) {
+    waves.open(fname,ios::binary);
+    binaryfile=true;}
+  else {
+    waves.open(fname);
+    binaryfile=false;}
+}
+
+bool channel::isbinary(const char *f){
+  string fs(f);
+  bool bin = false;  
+  if (fs.find(".dat",fs.size()-4) != string::npos) bin=true;    
+  return bin;
+}
+
+void channel::readfloat(ifstream &is, float &pVal, bool binary){
+  if (binary){
+    static char ch[sizeof(float)];//ch is shared between calls of readfloat
+    static int size = sizeof(float) ;//size is shared between calls of readlfoat
+    is.read(ch, size);
+    memcpy(&pVal,ch,size);
+  }
+  else 
+    is>>pVal;
 }
 
 void channel::loadNextEvent(){
   if (!waves.good()){cout<<"error opening file"<<endl; return;}
   for (int i=0;i<rlength;i++){
-    waves>>rawval[i];
+    readfloat(waves,rawval[i], binaryfile);
     //debug
     //    cout<<" record" << i<<endl;
     if(waves.eof()) {
@@ -72,15 +97,30 @@ void channel::loadNextEvent(){
 
 
 void channel::loadEvent(int index){
-  ifstream tmpwaves(fname);
+  ifstream tmpwaves;
+  if (binaryfile)
+    tmpwaves.open(fname,ios::binary);
+  else
+    tmpwaves.open(fname);    
+
   if (!tmpwaves.good()){cout<<"error opening file"<<endl; return;}
-  double dummy;
-  for (int i=0;i<rlength*index;i++){tmpwaves>>dummy;}
-  
+  //skip to the right position in the file
+  float dummy;
+  char ch[sizeof(float)];
+  if (binaryfile) 
+    for (int i=0;i<rlength*index;i++) 
+      tmpwaves.read(ch, sizeof(float));
+  else 
+    for (int i=0;i<rlength*index;i++) 
+      tmpwaves>>dummy;
+
+  //load a waveform
   for (int i=0;i<rlength;i++){
     if(tmpwaves.eof()) continue;
-    tmpwaves>>rawval[i];
+    readfloat(tmpwaves,rawval[i],binaryfile);
   }
+
+  //apply pedestal subtraction
   calibrate();
   calibrated=true;
   tmpwaves.close();
@@ -118,13 +158,19 @@ TGraph* channel::plotPedestal(){
 
 void channel::loadPedestals(const char* pedestalfilename, int npedestals){
   for(int i=0;i<rlength;i++){pedestals[i]=0;}
-  ifstream pedestalsfile(pedestalfilename);
-  double dummy;
+  ifstream pedestalsfile;
+  bool binarypedestals=isbinary(pedestalfilename);
+  if (binarypedestals)
+    pedestalsfile.open(pedestalfilename,ios::binary);    
+  else
+    pedestalsfile.open(pedestalfilename);
+  float dummy;
   int nwaves=0;
   int iline=0;
   while(!pedestalsfile.eof() && (nwaves<npedestals || npedestals<=0)  ) {
     for (int i=0;i<rlength;i++){
-      pedestalsfile>>dummy;
+      readfloat(pedestalsfile,dummy,binarypedestals);
+      
       if(pedestalsfile.eof()) {
 	if (i!=0){
 	  cout<<"error loading pedestals: corrupted data, eof before end of record ";
@@ -215,14 +261,11 @@ double channel::smoothmax(int nchannels){
 }
 
 
-
-
-
 TH1F* pulseheight(const char * fdata="data/wave.01_1.txt", 
 		  const char* fpedestals="pedestals/pedestal.01_1.txt"){
-  channel *ch=new channel(fdata,fpedestals,10000);
-  //TH1F *h= new TH1F("ph","pulse_height",100,-100,30000);
-  TH1F *h= new TH1F("ph","pulse_height",250,0,200);
+  //  channel *ch=new channel(fdata,fpedestals,10000);
+  channel *ch=new channel(fdata,fpedestals);
+  TH1F *h= new TH1F("ph","pulse_height",550,-50,500);
   int ievent=0;
   while (!(ch->eof())){
     ch->loadNextEvent();
