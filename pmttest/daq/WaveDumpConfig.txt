@@ -37,8 +37,8 @@ GNUPLOT_PATH  "/usr/bin/"
 # OUTPUT_FILE_FORMAT: output file can be either ASCII (column of decimal numbers) or binary 
 # (2 bytes per sample, except for Mod 721 and Mod 731 that is 1 byte per sample)
 # options: BINARY, ASCII
- OUTPUT_FILE_FORMAT  ASCII
-# OUTPUT_FILE_FORMAT  BINARY
+# OUTPUT_FILE_FORMAT  ASCII
+ OUTPUT_FILE_FORMAT  BINARY
 
 # OUTPUT_FILE_HEADER: if enabled, the header is included in the output file data
 # options: YES, NO
@@ -47,6 +47,8 @@ OUTPUT_FILE_HEADER  NO
 # RECORD_LENGTH = number of samples in the acquisition window
 # For the models 742 the options available are only 1024, 520, 256 and 136
 RECORD_LENGTH  1024
+#RECORD_LENGTH  512
+#RECORD_LENGTH  256
 
 # TEST_PATTERN: if enabled, data from ADC are replaced by test pattern (triangular wave)
 # options: YES, NO
@@ -70,18 +72,23 @@ FAST_TRIGGER   ACQUISITION_ONLY
 
 # FAST_TRIGGER_DIGITIZING: ONLY FOR 742 MODELS. If enabled the fast trigger signal is digitized and it is present in data readout as channel n.8 for each group.
 # options: YES, NO
-ENABLED_FAST_TRIGGER_DIGITIZING		YES		
-#ENABLED_FAST_TRIGGER_DIGITIZING		NO	
+# note: fast trig digitizing adds ~70microseconds of dead time
+#ENABLED_FAST_TRIGGER_DIGITIZING		YES		
+ENABLED_FAST_TRIGGER_DIGITIZING		NO	
 
 # MAX_NUM_EVENTS_BLT: maximum number of events to read out in one Block Transfer. High values corresponds to 
 # options: 1 to 1023
-MAX_NUM_EVENTS_BLT   10
+MAX_NUM_EVENTS_BLT   100
 
 # POST_TRIGGER: post trigger size in percent of the whole acquisition window
 # options: 0 to 100
 # On models 742 there is a delay of about 35nsec on signal Fast Trigger TR; the post trigger is added to this delay  
 ## for laser use 150ns delay
+#with 1024 samples
 POST_TRIGGER  70
+#with 512 samples
+#POST_TRIGGER  55
+
 
 # TRIGGER_EDGE: decides whether the trigger occurs on the rising or falling edge of the signal
 # options: RISING, FALLING
@@ -246,7 +253,7 @@ GROUP_TRG_ENABLE_MASK  00
 DC_OFFSET              32767	
 #TRIGGER_THRESHOLD      31750	
 #
-TRIGGER_THRESHOLD      20000
+TRIGGER_THRESHOLD      22000
 #1.1V
 #TRIGGER_THRESHOLD      36044
 #1.2V
