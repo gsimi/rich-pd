@@ -23,7 +23,9 @@ fitscan(char* fname="",
 
   //get ph distribution
   TFile* histf=new TFile(fname);
-  TH1F *h = (TH1F*)gDirectory->Get("ph");
+  //  TH1F *h = (TH1F*)gDirectory->Get("ph");
+  TCanvas* c= (TCanvas*)gDirectory->Get("c1");
+  TH1F *h = (TH1F*)c->FindObject("ph");
   double bw=h->GetBinWidth(1);
   int dim=h->GetNbinsX();
   double xmin=h->GetXaxis()->GetXmin();
@@ -83,7 +85,7 @@ fitscan(char* fname="",
      npar=9;  
      f=new TF1("spectrfit",fitf,xmin,xmax,npar);
      f->SetParNames( "mu","gain","gNoise","offset","iNoise","ln_norm","ct");//,"eff","bw");
-     f->SetParameters(mu,  gain,  noise,  offset,   noise,   log(norm),0.03);
+     f->SetParameters(mu,  gain,  10*noise,  offset,   noise,   log(norm),0.03);
      f->FixParameter(7,1);//eff 
      f->FixParameter(8,bw);//bw
      break;
@@ -106,7 +108,7 @@ fitscan(char* fname="",
   
   f->SetParLimits(0,0,20*mu); //mu
   f->SetParLimits(1,bw,10*gain); //gain
-  f->SetParLimits(2,bw/5,50*bw); //gnoise
+  f->SetParLimits(2,bw/5,2*gain); //gnoise
   f->SetParLimits(3,-100*bw,100*bw);//offset
   //  f->SetParLimits(4,bw/50,50*bw);//inoise
   //  f->FixParameter(4,0);//inoise
@@ -129,6 +131,9 @@ fitscan(char* fname="",
   //Draw
   gStyle->SetOptFit(111);
   h->SetMinimum(0.1);
+  cout<<"drawing"<<endl;
+  TCanvas * c= new TCanvas("c","c",800,600);
+  c->SetLogy(1);
   h->Draw();
   return f;
 }

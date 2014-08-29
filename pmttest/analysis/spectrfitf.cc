@@ -16,6 +16,22 @@
 
 #include "spectrfitf.h"
 
+Double_t pmtfitf(Double_t* x, Double_t* par) {
+  /*===========================================================
+         par[0]  ->   Poisson average N
+         par[1]  ->   1 p.e. ADC separation
+         par[2]  ->   gain RMS contribution
+         par[3]  ->   N=0 ADC offset
+         par[4]  ->   sigma noise fabs(vecxp.at(1)-vecxp.at(0))
+         par[5]  ->   Absolute count normalisation
+	 
+	 par[6]  ->   Cross talk probability (ref. http://www.gap-optique.unige.ch/Publications/PDF/SiPM-OPticsExpress.pdf)
+	 par[7]  ->   Eff
+	 par[8]  ->   bin width, needed for normalization
+  =============================================================*/
+  return 0;
+}
+
 Double_t fitf(Double_t* x, Double_t* par) {
   /*===========================================================
          par[0]  ->   Poisson average N
