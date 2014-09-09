@@ -18,6 +18,7 @@ using namespace std;
 TF1*
 fitscan(char* fname="", 
 	double fmin=0, double fmax=1){
+
   // fmin,fmax are the fit limits expressed as fraction of the histogram range
 
   bool debug=true;
@@ -25,8 +26,13 @@ fitscan(char* fname="",
   //get ph distribution
   TFile* histf=new TFile(fname);
   //  TH1F *h = (TH1F*)gDirectory->Get("ph");
-  TCanvas* c= (TCanvas*)gDirectory->Get("c1");
-  TH1F *h = (TH1F*)c->FindObject("ph");
+  TCanvas* c1= (TCanvas*)gDirectory->Get("c1");
+  TH1F *h = (TH1F*)c1->FindObject("ph");
+  return fitscan(h,fmin,fmax);
+}
+
+TF1*
+fitscan(TH1F* h, double fmin=0, double fmax=1){
   double bw=h->GetBinWidth(1);
   int dim=h->GetNbinsX();
   double xmin=h->GetXaxis()->GetXmin();
@@ -68,22 +74,21 @@ fitscan(char* fname="",
   pf.Print("V");
   const int npeaks=pf.GetNPeaks();
   double gain=25,offset=0,noise=12,mu=0.5;
-  //  if (npeaks==1){
-  //  double x;
-  //  int ix;
-  //  x=pf.GetPositionX();
-  //  sort(x,x+npeaks-1);
-  //  double pxmin=x,pxmax=x;
-  //  gain=(pxmax-pxmin)/(npeaks-1);
-  //  offset=pxmin;
-  //  mu=pf.GetPositionY()/pf.GetPositionY()*20
-  //}
+  if (npeaks==1){
+    double x[npeaks];
+    int ix[npeaks];
+    x[0]=pf.GetPositionX();
+    offset=x[0];
+    mu=0.01;
+  }
+  double pxmin,pxmax;
   if (npeaks>1){
     double x[npeaks];
     int ix[npeaks];
     for (int i=0;i<npeaks;i++) x[i]=pf.GetPositionX()[i];
     sort(x,x+npeaks-1);
-    double pxmin=x[0],pxmax=x[npeaks-1];
+    pxmin=x[0];
+    pxmax=x[npeaks-1];
     gain=(pxmax-pxmin)/(npeaks-1);
     offset=pxmin;
     mu=pf.GetPositionY()[1]/pf.GetPositionY()[0]*20;//approximate
@@ -97,15 +102,17 @@ fitscan(char* fname="",
   }
 
   printf("npeaks = %d\n",npeaks);
-  printf("pxmin = %2.2f\n",pxmin);
-  printf("pxmax = %2.2f\n",pxmax);
+  if (npeaks>1){
+    printf("pxmin = %2.2f\n",pxmin);
+    printf("pxmax = %2.2f\n",pxmax);
+  }
   printf("gain = %2.2f\n",gain);
   printf("offset = %2.2f\n",offset);
   printf("mu = %2.2f\n",mu);
   printf("noise = %2.2f\n",noise);
 
   //now setup the fit function
-  gROOT->ProcessLine(".L analysis/spectrfitf.cc+");
+  gROOT->ProcessLine(".L ../analysis/spectrfitf.cc+");
   int fitmodel=3; //1=fitf, 2=fitf_g2 double gaussian model, 3=pmtfit, 4=pmtfit2
   int npar; TF1* f;
 
@@ -116,6 +123,7 @@ fitscan(char* fname="",
      f=new TF1("spectrfit",fitf,xmin,xmax,npar);
      f->SetParNames( "mu","gain","gNoise","offset","iNoise","ln_norm","ct");//,"eff","bw");
      f->SetParameters(mu,  gain,  noise,  offset,    noise/10,   log(norm),0.03);
+     f->FixParameter(6,0);//ct fixed
      f->FixParameter(7,1);//eff 
      f->FixParameter(8,bw);//bw
      break;
@@ -125,6 +133,7 @@ fitscan(char* fname="",
     f=new TF1("spectrfit",fitf_g2,xmin,xmax,npar);
     f->SetParNames(  "mu","gain","gNoise","offset","iNoise","ln_norm","ct","g2p","g2off","g2sigma");//,"eff","bw");    break;
     f->SetParameters(mu,gain     ,noise  ,offset       ,noise/10     ,log(norm)  ,0.03, 0.1, gain/5,2/5*noise);
+    f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,0.9);//g2p
     //  f->FixParameter(7,0);
     f->SetParLimits(8,0,gain);//g2off
@@ -139,10 +148,15 @@ fitscan(char* fname="",
   case 3:
     npar=11;  
     f=new TF1("spectrfit",pmtfit,xmin,xmax,npar);
-    f->SetParNames( "mu","gain","gNoise","offset","iNoise","norm","ct","mu1",  "P1dyn");//,"eff","bw");
-    f->SetParameters(mu,  gain,  noise,   offset,  noise/10,   norm,0.0, mu, 0.05);//
+    f->SetParNames( "mu","gain","gNoise","offset","iNoise","norm","fgain1","mu1",  "P1dyn");//,"eff","bw");
+    f->SetParameters(mu,  gain,  noise,   offset,  noise/10,   norm, 1./(2.3*3.2), mu, 0.05);//
+    f->FixParameter(6,1./(2.3*3.2));//fgain1
     f->SetParLimits(7,0.0,10*mu+1);//mu1
     f->SetParLimits(8, 0,  1);//P1dyn
+    if (npeaks==1) { 
+      f->FixParameter(7,0.01);
+      f->FixParameter(8,0);
+    }
     f->FixParameter(9,1);//eff 
     f->FixParameter(10,bw);//bw
     break;
@@ -152,6 +166,7 @@ fitscan(char* fname="",
     f=new TF1("spectrfit",pmtfit2,xmin,xmax,npar);
     f->SetParNames( "mu","gain","gNoise","offset","iNoise","ln_norm","ct","P","f");//,"eff","bw");
     f->SetParameters(mu,  gain,  noise,  offset,   noise/10,   log(norm),0.0);//,0.1,0.3 );
+    f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,1);
     f->SetParLimits(8,0,1);
     f->FixParameter(9,1);//eff 
@@ -164,10 +179,14 @@ fitscan(char* fname="",
   f->SetParLimits(0,0,      20*mu); //mu
   f->SetParLimits(1,bw,     10*gain); //gain
   f->SetParLimits(2,bw/5,   4*gain); //gnoise
+  if (npeaks==1) { 
+    f->FixParameter(0,0.01);
+    f->FixParameter(1,0); 
+    f->FixParameter(2,bw);
+  }
   f->SetParLimits(3,-100*bw,100*bw);//offset
   f->SetParLimits(4,bw/50,  2*noise);//inoise
   f->SetParLimits(5,norm-20*sqrt(norm) , norm+20*sqrt(norm));//norm
-  f->FixParameter(6,0);//ct fixed
    
   cout<<"initial fit parameters:"<<endl;
   double pmin,pmax;
@@ -179,6 +198,10 @@ fitscan(char* fname="",
   //Fit
   cout<<"fitting spectrum in ["<<xmin<<";"<<xmax<<"] ..."<<endl;
   h->Fit(f,"EML","",xmin,xmax);
+  // f->ReleaseParameter(6);
+  // f->SetParLimits(6,0.01,0.5);//fgain1
+  // h->Fit(f,"EML","",xmin,xmax);
+
   cout<<"done"<<endl;
 
   //Draw
