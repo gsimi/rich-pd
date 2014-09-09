@@ -11,6 +11,7 @@
 
 
 #include <algorithm>
+#include <fstream> 
 #include "waveforms.C"
 #include "TCanvas.h"
 using namespace std;
@@ -208,9 +209,18 @@ mfitscan(char *dir="/data/superb/SiPM/RadHard/Feb2011LNL/"){
    The fitted values for file ifile of parametr jpar is:
    par[ifile,jpar] = pararray[ifile*npars + 2*jpar]
    epar[ifile,jpar] = pararray[ifile*npars + 2*jpar + 1]
+   PARAMETER : 
 */
 
-double* mfitscan(vector<string> flist, char* fitted_data="fitpar.dat"){
+double* mfitscan(char * dir="fl", char* fitted_data="fitpar.dat"){
+  ifstream list(dir);
+  vector<string> flist;
+  string s;
+  int lines = std::count(std::istreambuf_iterator<char>( file ),std::istreambuf_iterator<char>(), '\n' ); 
+  for(int i=0;i<lines; i++){
+    list>>s;
+    flist.push_back("/home/lhcb/rich-pd/pmttest/"+s);
+  }
   ofstream out; out.open(fitted_data);
   const int nfiles(flist.size());
   const int npars=11; //this is hardwired, should be possible to extract it from f
@@ -292,8 +302,10 @@ TH2F* uniformity(const char* rdata="test.dat", int ipar){
   h->SetXTitle("pixel 1 to 8");
   h->SetYTitle("pixel 1 to 57");
   ifstream file(rdata);
-  char * ch= new char[256];
-  file>>ch;
+  string  ch;
+  getline(file, ch);
+  //file>>ch;
+  cout<<ch<<endl;
   const int npar(24);
   double value[npar];
   while(!file.eof()){
@@ -305,7 +317,7 @@ TH2F* uniformity(const char* rdata="test.dat", int ipar){
     float pixel=value[23];
     int x = int(pixel-1)%8+1;
     int y = int((pixel-0.001)/8)+1;
-    cout<<" x "<<x<<" y "<<y<<" val "<<value[ipar]<<endl;
+    // cout<<" x "<<x<<" y "<<y<<" val "<<value[ipar]<<endl;
     h->SetBinContent(x,y,value[ipar]);
   }
   h->Draw("colz");
