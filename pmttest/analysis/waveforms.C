@@ -288,3 +288,34 @@ void waveforms(){
   h->Write("ph1");
   f.Close();
 }
+
+
+TH1F** phsuperimposition(){
+  const int nh=64;
+  TH1F* harr[nh];
+  for (int i=0; i<nh; i++){ 
+    char fn[256]; 
+    sprintf(fn,"data/px%.2d/950V/tune0.root",i+1); 
+    //    cout<<fn<<endl; 
+    TFile *f=new TFile(fn); 
+    TCanvas* c1=(TCanvas*)f->FindObjectAny("c1");
+    if (i==0) c1->Draw();
+    TH1F* h=(TH1F*)c1->FindObject("ph"); 
+    harr[i]=(TH1F*)h->Clone();
+  }
+  TCanvas *c=new TCanvas("canv","canv",800,600);
+  c->Draw();
+  for (int i=0;i<nh;i++){
+    const int ngroup=5;
+    harr[i]->Rebin(ngroup);
+    //    harr[i]->Smooth();
+    harr[i]->SetMaximum(200*ngroup);
+    harr[i]->SetLineColor(i);
+    harr[i]->GetXaxis()->SetRange(int(10./ngroup),int(250./ngroup));
+    harr[i]->SetStats(kFALSE);
+    if (harr[i]->GetMean() > 5) harr[i]->Draw(i==0?"l":"l same");
+    else cout<<"excluded pix "<<i+1<<endl;
+  }
+  return harr;
+
+}
