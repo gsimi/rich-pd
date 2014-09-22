@@ -234,8 +234,8 @@ mfitscan(char *dir="/data/superb/SiPM/RadHard/Feb2011LNL/"){
    epar[ifile,jpar] = pararray[ifile*npars + 2*jpar + 1]
 */
 
-double* mfitscan(char * dir="filelist", char* fitted_data="testtt"){
-  ifstream list(dir);
+double* mfitscan(char * filelist="filelist.txt", char* fitted_data="fitted_data.txt"){
+  ifstream list(filelist);
   vector<string> flist;
   string s;
   //int lines = std::count(std::istreambuf_iterator<char>( file ),std::istreambuf_iterator<char>(), '\n' ); 
