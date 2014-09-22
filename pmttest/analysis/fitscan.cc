@@ -232,15 +232,14 @@ mfitscan(char *dir="/data/superb/SiPM/RadHard/Feb2011LNL/"){
    The fitted values for file ifile of parametr jpar is:
    par[ifile,jpar] = pararray[ifile*npars + 2*jpar]
    epar[ifile,jpar] = pararray[ifile*npars + 2*jpar + 1]
-   PARAMETER : 
 */
 
-double* mfitscan(char * dir="fl", char* fitted_data="fitpar.dat"){
+double* mfitscan(char * dir="filelist", char* fitted_data="testtt"){
   ifstream list(dir);
   vector<string> flist;
   string s;
-  int lines = std::count(std::istreambuf_iterator<char>( file ),std::istreambuf_iterator<char>(), '\n' ); 
-  for(int i=0;i<lines; i++){
+  //int lines = std::count(std::istreambuf_iterator<char>( file ),std::istreambuf_iterator<char>(), '\n' ); 
+  for(int i=0;i<64; i++){
     list>>s;
     flist.push_back("/home/lhcb/rich-pd/pmttest/"+s);
   }
@@ -249,16 +248,17 @@ double* mfitscan(char * dir="fl", char* fitted_data="fitpar.dat"){
   const int npars=11; //this is hardwired, should be possible to extract it from f
   double* parmatrix = new double[nfiles*npars*2];
   for (int ifile=0;ifile<nfiles; ifile++){
+    cout<<"\n"<<"file directory : "<<flist[ifile].c_str()<<endl;
     TF1* f=fitscan(flist[ifile].c_str(),5./100,1);
     if (f==0){ cout<<"Error, fit for "<<flist[ifile].c_str()<<
 	" not found, skipping"<<endl;
       continue;}
     if (ifile==0){
-      out<<"ifile \t"; 
+      out<<"ifile\t"; 
       for(int j=0;j<npars;j++){
-	out<<":"<<f->GetParName(j)<<"\t"<<":e"<<f->GetParName(j)<<"\t";
+	out<<f->GetParName(j)<<"\t"<<"e"<<f->GetParName(j)<<"\t";
       }
-      out<<":dr:t"<<endl;
+      out<<"pxNumber"<<endl;
 
     }
     double *fitpar=f->GetParameters();
@@ -271,7 +271,13 @@ double* mfitscan(char * dir="fl", char* fitted_data="fitpar.dat"){
     }
     //    out<<darkrate(f,flist[ifile].c_str(),gate)<<"\t";
     //    out<<filetime(flist[ifile])<<"\t";
-    out<<flist[ifile].c_str()<<endl;
+    string pxname;
+    string path;
+    size_t pos;
+    path = flist[ifile].c_str();
+    pos = path.find("px");
+    pxname = path.substr(pos+2,2);
+    out<<pxname<<endl;
     if (f!=0) delete f;
   }
   return parmatrix;
@@ -317,20 +323,47 @@ vector<string> GetListOfFiles(char* dirname, char* match=0){
 }
 
 
-TH2F* uniformity(const char* rdata="test.dat", int ipar){
-  char var[10]; 
-  //sprintf(var,"%d",ipar);
-  sprintf(var,"P1dyn",ipar);
-  TH2F *h = new TH2F("uniformity",var,8,0,7, 8,0,7);
+TH2F* datasheet(const char* rdata="datasheet"){
+  TH2F *h = new TH2F("datasheet","gain",8,0,7, 8,0,7);
   h->SetXTitle("pixel 1 to 8");
   h->SetYTitle("pixel 1 to 57");
   ifstream file(rdata);
-  string  ch;
-  getline(file, ch);
-  //file>>ch;
+  double  ch;
   cout<<ch<<endl;
+  //file>>ch;
+  for(int i=1;i<65;i++){
+    if (file.eof()) break;
+    int x = int(i-1)%8+1;
+    int y = int((i-0.001)/8)+1;
+    // cout<<" x "<<x<<" y "<<y<<" val "<<value[ipar]<<endl;
+    //getline(file,ch);
+    file>>ch;
+    h->SetBinContent(x,y,ch);
+  }
+  h->Draw("colz");
+  return h;
+}
+
+
+TH2F* uniformity(const char* rdata="test.dat", int ipar=3, int normpx=61){
+  char var[10];
+  //sprintf(var,"%d",ipar);
+
   const int npar(24);
+  if(ipar>=npar){break;}
+  ifstream file(rdata);
+  string  ch;
+  string parname[npar];
+  for(int i=0; i<npar;i++){
+    file>>parname[i];
+  }
+  const char * title=parname[ipar].c_str();
+  //sprintf(var,"gain",ipar);
+  TH2F *h = new TH2F("uniformity",title,8,0,7, 8,0,7);
+  h->SetXTitle("pixel 1 to 8");
+  h->SetYTitle("pixel 1 to 57");
   double value[npar];
+  double normvalue=100;
   while(!file.eof()){
     for (int i=0;i<npar;i++) {
       file>>value[i];
@@ -340,9 +373,28 @@ TH2F* uniformity(const char* rdata="test.dat", int ipar){
     float pixel=value[23];
     int x = int(pixel-1)%8+1;
     int y = int((pixel-0.001)/8)+1;
+    if(int(pixel+0.0001)==normpx){
+      normvalue=value[ipar];
+    }
     // cout<<" x "<<x<<" y "<<y<<" val "<<value[ipar]<<endl;
     h->SetBinContent(x,y,value[ipar]);
   }
+  h->Scale(100./normvalue);
+  h->SetStats(0);
   h->Draw("colz");
+  TPaveText *pt=new TPaveText(0.7,0.85,0.98,0.98,"brNDC");
+  char  legend1[100] ;
+  char c1[20];
+  sprintf(c1,"%d",normpx);
+  strcpy(legend1,"normpx : ");
+  strcat(legend1,c1);
+  pt->AddText(legend1);
+  char  legend2[100] ;
+  char c2[100];
+  sprintf(c2,"%f",normvalue);
+  strcpy(legend2,"value for normpx : ");
+  strcat(legend2,c2);
+  pt->AddText(legend2);
+  pt->Draw();
   return h;
 }
