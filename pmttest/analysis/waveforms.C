@@ -24,6 +24,7 @@ public:
   double integral2();
   double maxval();
   double smoothmax(int nchannels=4);
+  float time();
   bool eof(){return waves.eof();};
   bool isbinary(const char *fname);
   void readfloat(ifstream &is, float& val, bool binary);
@@ -218,11 +219,15 @@ double channel::integral2(){
     return 0;
   }
   double sumbkg=0,sumsig=0;
-  int bkgmax=350; int sigmin=bkgmax; int sigmax=800;
-  for (int i=0;i<bkgmax;i++) sumbkg+=calibval[i];
+  int bkgmin=0, bkgmax=350; 
+  int sigmin=bkgmax, sigmax=800;//attention hardcoded numbers
+  for (int i=bkgmin;i<bkgmax;i++) sumbkg+=calibval[i];
   for (int i=sigmin;i<sigmax;i++) sumsig+=calibval[i];
-  sumsig-=sumbkg*(sigmax-sigmin)/bkgmax;
-  sumsig=sumsig/(sigmax-sigmin);
+  sumsig-=sumbkg*(sigmax-sigmin)/(bkgmax-bkgmin);
+  //this division is dangerous becuase the 
+  //result depends on the integration window even if the signal is localized
+  //completely inside the window
+  sumsig=sumsig/(sigmax-sigmin); 
   return sumsig;
 
 }
@@ -233,8 +238,8 @@ double channel::maxval(){
     cout<<"error: integral on non calibrated channel"<<endl;
     return 0;
   }
-  double bkg=0,max=0;
-  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;
+  double bkg=0,max=-1e3;
+  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;//attention hardcoded numbers
   for (int i=0;i<bkgmax;i++) bkg+=calibval[i];
   bkg=bkg/bkgmax;
   for (int i=sigmin;i<sigmax;i++) {if (calibval[i]>max) max=calibval[i];}
@@ -248,8 +253,8 @@ double channel::smoothmax(int nchannels){
     cout<<"error: integral on non calibrated channel"<<endl;
     return 0;
   }
-  double bkg=0,max=0;
-  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;
+  double bkg=0,max=-1e3;
+  int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;//attention hardcoded numbers
   for (int i=0;i<bkgmax;i++) bkg+=calibval[i];
   bkg=bkg/bkgmax;
   for (int i=sigmin;i<sigmax-nchannels;i++) {
@@ -261,19 +266,50 @@ double channel::smoothmax(int nchannels){
   return max-bkg;
 }
 
+ float channel::time(){
+   if (!calibrated){
+     cout<<"error: integral on non calibrated channel"<<endl;
+     return 0;
+   }
+   int bkgmin=0, bkgmax=350; 
+   int sigmin=bkgmax, sigmax=800;//attention hardcoded numbers
+   //compute pedestal
+   double pedestal=0;
+   for (int i=bkgmin;i<bkgmax;i++) pedestal+=calibval[i];
+   pedestal=pedestal/(bkgmax-bkgmin);
+   cout<<"pedestal "<<pedestal<<endl;//debug
+   //find maximum
+   double max=-1e3;
+   for (int i=sigmin;i<sigmax;i++) {if (calibval[i]>max) max=calibval[i];}
+   //find time for which signal is >50% of maximum
+   cout<<"max "<<max<<endl;
+   float t0=0;
+   for (int i=sigmin;i<sigmax;i++) {
+     if ((calibval[i]-pedestal)>0.5*(max-pedestal)) {
+       t0=t[i]; 
+       break;
+     }
+   }
+   cout<<"t0 "<<t0<<endl;
+   return t0;
+ }
 
 TH1F* pulseheight(const char * fdata="data/wave.01_1.txt", 
 		  const char* fpedestals="pedestals/pedestal.01_1.txt"){
   //  channel *ch=new channel(fdata,fpedestals,10000);
   channel *ch=new channel(fdata,fpedestals);
   TH1F *h= new TH1F("ph","pulse_height",550,-50,500);
+  TH1F *t= new TH1F("t","pulse_time",550, 300,850);
   int ievent=0;
   while (!(ch->eof())){
     ch->loadNextEvent();
     ievent++;
     if (ievent%10000==0) cout<<"."<<flush;
-    double integr=ch->integral2();
+    float integr=ch->integral2();
+    //    float integr=ch->smoothmax(3);
     h->Fill(integr,1);
+    if (integr>4)
+      t->Fill(ch->time());
   }
   cout<<endl;
   TCanvas *c1=new TCanvas("c1","c1",800,600);
