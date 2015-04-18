@@ -3,6 +3,7 @@
 #include <fstream>
 #include "TH1F.h"
 #include "TFile.h"
+#include "TCanvas.h"
 using namespace::std;
 
 class channel{
@@ -275,7 +276,9 @@ TH1F* pulseheight(const char * fdata="data/wave.01_1.txt",
     h->Fill(integr,1);
   }
   cout<<endl;
+  TCanvas *c1=new TCanvas("c1","c1",800,600);
   h->Draw();
+  c1->Update();
   return h;
 }
 
@@ -289,13 +292,13 @@ void waveforms(){
   f.Close();
 }
 
-/*
+
 TH1F** phsuperimposition(){
   const int nh=64;
-  TH1F* harr[nh];
+  TH1F** harr; harr = new TH1F*[nh];
   for (int i=0; i<nh; i++){ 
     char fn[256]; 
-    sprintf(fn,"data/px%.2d/950V/tune0.root",i+1); 
+    sprintf(fn,"/home/lhcb/rich-pd/pmttest/workdir/data/dataset2/px%.2d/950V/ph.root",i+1); 
     //    cout<<fn<<endl; 
     TFile *f=new TFile(fn); 
     TCanvas* c1=(TCanvas*)f->FindObjectAny("c1");
@@ -319,4 +322,4 @@ TH1F** phsuperimposition(){
   return harr;
 
 }
-*/
+
