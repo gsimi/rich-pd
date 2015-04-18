@@ -91,10 +91,10 @@ Double_t pmtpdf_gaus(Double_t* x, Double_t* par) {
 
   for (int i=minN; i<maxN; i++) {
     Double_t sigma = sqrt(noise*noise+float(i)*grms*grms);
-    Double_t sigma2 = sqrt(noise*noise+float(i)*grms1*grms1);
+    Double_t sigma1 = sqrt(noise*noise+float(i)*grms1*grms1);
     
     Double_t xm = ped + float(i)*gain;
-    Double_t xm2 = ped + float(i)*gain/g1;
+    Double_t xm1 = ped + float(i)*gain/g1;
 
     //    if (debug)     printf (" sigma = %f, noise = %f, xm = %f, grms = %f\n",sigma,noise,xm,grms);
     
@@ -104,7 +104,7 @@ Double_t pmtpdf_gaus(Double_t* x, Double_t* par) {
 	   the number of p.e. and probability computed above
 	*/
       valK += probarr[i] * exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
-      val1 += probarr1[i] * exp(-0.5*((*x-xm2)*(*x-xm2))/sigma2/sigma2)*gausfac/sigma2 ;	 
+      val1 += probarr1[i] * exp(-0.5*((*x-xm1)*(*x-xm1))/sigma1/sigma1)*gausfac/sigma1 ;	 
   }
   return   norm*eff*((1-frac)*valK+frac*val1)*bw;
 }
@@ -184,14 +184,14 @@ Double_t pmtpdf_gaus2(Double_t* x, Double_t* par) {
   
   for (int i=minN; i<maxN; i++) {
     Double_t sigma = sqrt(noise*noise+float(i)*grms*grms);
-     Double_t sigma2 = sqrt(noise*noise+f*grms*grms);
+     Double_t sigma1 = sqrt(noise*noise+f*grms*grms);
     
     Double_t xm = ped + float(i)*gain;
-    // Double_t xm2 = ped + float(i)*gain2;
+    // Double_t xm1 = ped + float(i)*gain2;
 
     if (debug)     printf (" sigma = %f, noise = %f, xm = %f, grms = %f\n",sigma,noise,xm,grms);
      if (i==0){
-       val += eff * probarr[i] *((1-P)* exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma + P*(gausfac/(sigma2))*exp(-0.5*((*x-gain*f)*(*x-gain*f))/(sigma2*sigma2)));
+       val += eff * probarr[i] *((1-P)* exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma + P*(gausfac/(sigma1))*exp(-0.5*((*x-gain*f)*(*x-gain*f))/(sigma1*sigma1)));
        } else{
 	/* 
 	   val is the distribution of the signal amplitudes

@@ -277,20 +277,32 @@ double channel::smoothmax(int nchannels){
    double pedestal=0;
    for (int i=bkgmin;i<bkgmax;i++) pedestal+=calibval[i];
    pedestal=pedestal/(bkgmax-bkgmin);
-   cout<<"pedestal "<<pedestal<<endl;//debug
+   //   cout<<"pedestal "<<pedestal<<endl;//debug
    //find maximum
    double max=-1e3;
-   for (int i=sigmin;i<sigmax;i++) {if (calibval[i]>max) max=calibval[i];}
-   //find time for which signal is >50% of maximum
-   cout<<"max "<<max<<endl;
-   float t0=0;
+   int nchannels=3;
+   for (int i=sigmin;i<sigmax-nchannels;i++) {
+    double average=0;
+    for (int j=0;j<nchannels;j++){average+=calibval[i+j];}
+    average=average/nchannels;
+    if (average>max) max=average;}
+   //find time for which signal is >30% and 70% of maximum
+   //   cout<<"max "<<max<<endl;
+   float t4=0,t6=0; int iprev=sigmin;
    for (int i=sigmin;i<sigmax;i++) {
-     if ((calibval[i]-pedestal)>0.5*(max-pedestal)) {
-       t0=t[i]; 
+     if ((calibval[i]-pedestal)>0.4*(max-pedestal)) {
+       t4=(t[i-1]+t[i])/2; break;
+       iprev=i;
+     }
+   }
+   for (int i=iprev;i<sigmax;i++) {
+     if ((calibval[i]-pedestal)>0.6*(max-pedestal)) {
+       t6=(t[i-1]+t[i])/2; 
        break;
      }
    }
-   cout<<"t0 "<<t0<<endl;
+   float t0=t4-(t6-t4)*4./(6-4);
+   //cout<<"t0 "<<t0<<endl;//debug
    return t0;
  }
 
@@ -307,9 +319,10 @@ TH1F* pulseheight(const char * fdata="data/wave.01_1.txt",
     if (ievent%10000==0) cout<<"."<<flush;
     float integr=ch->integral2();
     //    float integr=ch->smoothmax(3);
-    h->Fill(integr,1);
+    float time=420;
     if (integr>4)
-      t->Fill(ch->time());
+      t->Fill(time=ch->time());
+    h->Fill(integr,1);
   }
   cout<<endl;
   TCanvas *c1=new TCanvas("c1","c1",800,600);

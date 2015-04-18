@@ -248,7 +248,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   //  f->SetLineColor(kBlue);
   f->ReleaseParameter(6);
   f->SetParLimits(6,0.3*gain1,4*gain1);//gain1
-  h->Fit(f,"EM","",xmin,xmax);
+  h->Fit(f,"EML","",xmin,xmax);
 
   cout<<"done"<<endl;
 
