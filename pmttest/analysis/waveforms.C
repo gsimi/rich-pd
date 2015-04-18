@@ -3,6 +3,7 @@
 #include <fstream>
 #include "TH1F.h"
 #include "TFile.h"
+#include "TCanvas.h"
 using namespace::std;
 
 class channel{
@@ -292,7 +293,7 @@ void waveforms(){
 
 TH1F** phsuperimposition(){
   const int nh=64;
-  TH1F* harr[nh];
+  TH1F** harr=new TH1F*[nh];
   for (int i=0; i<nh; i++){ 
     char fn[256]; 
     sprintf(fn,"data/px%.2d/950V/tune0.root",i+1); 
