@@ -1,0 +1,28 @@
+Circuit: * Z:\home\lhcb\rich-pd\pmttest\LTspice\CFOA-AD8000.asc
+
+Limiting rise time of source i1 to 1e-011
+Limiting fall time of source i1 to 1e-011
+WARNING: Node NC_01 is floating.
+
+WARNING: Less than two connections to node NC_01.  This node is used by C6.
+Direct Newton iteration for .op point succeeded.
+
+Date: Fri Oct 17 16:56:22 2014
+Total elapsed time: 1.903 seconds.
+
+tnom = 27
+temp = 27
+method = modified trap
+totiter = 80291
+traniter = 80250
+tranpoints = 40066
+accept = 40055
+rejected = 11
+matrix size = 78
+fillins = 42
+solver = Normal
+Thread vector: 12.8/8.5[2] 3.5/2.6[2] 3.9/3.3[2] 0.8/1.5[1]  2592/500
+Matrix Compiler1: 5.12 KB object code size  2.7/1.6/[0.7]
+Matrix Compiler2: 6.80 KB object code size  1.8/2.2/[1.2]
+
+
