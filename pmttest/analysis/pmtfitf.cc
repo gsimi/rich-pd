@@ -4,6 +4,11 @@
 
 #include "pmtfitf.h"
 
+
+template <typename T> int theta(T val) {
+  return (T(0) < val);
+}
+
 /* 
    Sum of Gaus functions with poisson probability 
 */
@@ -76,25 +81,23 @@ Double_t pmtpdf_gaus(Double_t* x, Double_t* par) {
     else {probarr[i]=0;probarr1[i]=0;}
   }//for (i=0; i<maxN)
   
-  /*
-  double p=0.25; double N=npe/p; 
-  for (int k=0; k<maxN; k++) {
-    if (k<=N) 
-      probarr[k]=TMath::Binomial(N,k)*pow(p,k)*pow(1-p,N-k);
-    else
-      probarr[k]=0; 
-  }
-  */  
-  
   Double_t valK=0;
   Double_t val1=0;
 
-  for (int i=minN; i<maxN; i++) {
-    Double_t sigma = sqrt(noise*noise+float(i)*grms*grms);
-    Double_t sigma1 = sqrt(noise*noise+float(i)*grms1*grms1);
+  int i=0;
+  Double_t sigma = sqrt(noise*noise+float(i)*grms*grms);
+  Double_t sigma1 = sqrt(noise*noise+float(i)*grms1*grms1);
+  Double_t xm = ped + float(i)*gain;
+  Double_t xm1 = ped + float(i)*gain/g1;
+  valK += probarr[i] * exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
+  val1 += probarr1[i] * exp(-0.5*((*x-xm1)*(*x-xm1))/sigma1/sigma1)*gausfac/sigma1 ;	 
+
+  for (i=1; i<maxN; i++) {
+    sigma = sqrt(noise*noise+float(i)*grms*grms);
+    sigma1 = sqrt(noise*noise+float(i)*grms1*grms1);
     
-    Double_t xm = ped + float(i)*gain;
-    Double_t xm1 = ped + float(i)*gain/g1;
+    xm = ped + float(i)*gain;
+    xm1 = ped + float(i)*gain/g1;
 
     //    if (debug)     printf (" sigma = %f, noise = %f, xm = %f, grms = %f\n",sigma,noise,xm,grms);
     
@@ -103,8 +106,10 @@ Double_t pmtpdf_gaus(Double_t* x, Double_t* par) {
 	   obtained as the sum of gaussian functions with mean proportional to 
 	   the number of p.e. and probability computed above
 	*/
-      valK += probarr[i] * exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
-      val1 += probarr1[i] * exp(-0.5*((*x-xm1)*(*x-xm1))/sigma1/sigma1)*gausfac/sigma1 ;	 
+    valK += probarr[i] * theta(*x-ped)/(0.5*(1+TMath::Erf(xm-ped)))* exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
+    //valK += probarr[i] * exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
+    val1 += probarr1[i] * theta(*x-ped)/(0.5*(1+TMath::Erf(xm-ped)))*exp(-0.5*((*x-xm1)*(*x-xm1))/sigma1/sigma1)*gausfac/sigma1 ;	 
+    //val1 += probarr1[i] *exp(-0.5*((*x-xm1)*(*x-xm1))/sigma1/sigma1)*gausfac/sigma1 ;	 
   }
   return   norm*eff*((1-frac)*valK+frac*val1)*bw;
 }
@@ -190,26 +195,21 @@ Double_t pmtpdf_gaus2(Double_t* x, Double_t* par) {
     // Double_t xm1 = ped + float(i)*gain2;
 
     if (debug)     printf (" sigma = %f, noise = %f, xm = %f, grms = %f\n",sigma,noise,xm,grms);
-     if (i==0){
-       val += eff * probarr[i] *((1-P)* exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma + P*(gausfac/(sigma1))*exp(-0.5*((*x-gain*f)*(*x-gain*f))/(sigma1*sigma1)));
-       } else{
-	/* 
-	   val is the distribution of the signal amplitudes
-	   obtained as the sum of gaussian functions with mean proportional to 
-	   the number of p.e. and probability computed above
-	*/
-    val += eff * probarr[i] * exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
-				 } 
+    /* 
+       val is the distribution of the signal amplitudes
+       obtained as the sum of gaussian functions with mean proportional to 
+       the number of p.e. and probability computed above
+    */
+    if (i==0){
+      val += eff * probarr[i] *((1-P)* exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma + P*(gausfac/(sigma1))*exp(-0.5*((*x-gain*f)*(*x-gain*f))/(sigma1*sigma1)));
+    } else{
+      val += eff * probarr[i] * theta(*x-ped)*exp(-0.5*((*x-xm)*(*x-xm))/sigma/sigma)*gausfac/sigma ;
+    } 
   }
   
   return val*exp(ln_norm)*bw;
 }
 
-
-
-template <typename T> int theta(T val) {
-  return (T(0) < val);
-}
 
 /* 
    Sum of Gaus functions convoluted with gauss + exp bkg
