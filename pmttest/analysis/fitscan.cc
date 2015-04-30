@@ -47,7 +47,7 @@ using namespace std;
     The gain1 depends on the HV with a power alpha~2/3
     gain1 = k* pow(HV*2.3/13,alpha) =k pow(HV*voltage_1/[sum_i voltage_i],alpha)
     The gain therefore depends on HV^(12*alpha)=HV^8
-    gainSpread=gain/sqrt(gain1)
+    gainSpread=gain/sqrt(gain1) because fluctuations at the first amplification stage dominate
 
   if npeaks==1 and forcesignal==false the fit is performed without the signal component
   if forcesiganl==1 the fit is performed with signal even if only one peak was found. 
@@ -58,7 +58,7 @@ using namespace std;
 */
 TF1*
 fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=false, int fitmodel=3){
-  //1=fitf, 2=fitf_g2 double gaussian model, 3=pmtfit, 4=pmtfit2, 5=bessel function
+  //1=fitf, 2=fitf_g2 double gaussian model, 3=pmtfit, 4=pmtfit2, 5=bessel function, 6=convolution of gaus with exp
   double bw=h->GetBinWidth(1);
   int dim=h->GetNbinsX();
   double xmin=h->GetXaxis()->GetXmin();
@@ -98,7 +98,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   double inoise=2; //noise estimate in ADC counts
 
   TSpectrum pf;
-  pf.Search(h,8,"nobackground",1e-3); //used to configure the fit
+  pf.Search(h,4,"nobackground",1e-3); //used to configure the fit
   pf.Print("V");
   const int npeaks=pf.GetNPeaks(); 
   printf("npeaks = %d\n",npeaks);
@@ -106,17 +106,6 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   sort(xpeak,xpeak+npeaks-1);
   if (npeaks>0) offset=xpeak[0];
   else offset=0;
-
-  //compute the secondary emission coefficient
-  //of the first dynode to account for signals from
-  // photoelectric conversions on the 1st dynote
-
-  //  double rescaling=0.30; //completely ad hoc rescaling
-  //  double gain1=k*pow(v1,alpha)/rescaling; //secondary emission coefficient for fist dynode
-  
-  //secondary emission coefficient for fist dynode obtained from voltage divider configuration  
-  // double k=pow(1e6,1./12)/pow(1000/13,alpha)/pow(2.3*1.2*0.5,alpha/12);
-  // double gain1=k*pow(2.3/13*HV,alpha)
   
   printf("gain = %2.2f\n",gain);
   printf("offset = %2.2f\n",offset);
@@ -150,11 +139,8 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
     f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,0.9);//g2p
-    //  f->FixParameter(7,0);
     f->SetParLimits(8,0,gain);//g2off
-    //  f->FixParameter(8,0);
     f->SetParLimits(9,bw/5,50*bw);//g2sigma
-    //  f->FixParameter(9,bw);
     f->FixParameter(10,1);//eff 
     f->FixParameter(11,bw);//bw
     break;
@@ -165,9 +151,9 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f=new TF1("spectrfit",pmtpdf_gaus,xmin,xmax,npar);
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","norm","gain1","npe1",  "frac");//,"eff","bw");
     f->SetParameters(npe,  gain,  gainSpread,   offset,  inoise,   norm, gain1, npe, 0.05);//
-    f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
+    f->SetParLimits(2,bw/5,   4*gain); //gainSpread
+    //releasing gain1 tends to give higher gain1 values than expected from calculations
     f->FixParameter(6,gain1);//gain1
-    //f->SetParLimits(6,0.3*gain1,3*gain1);//releasing gain1 tends to give higher gain1 values than expected from calculations
 
     f->SetParLimits(7,0.0,4*npe+1);//npe1
     f->SetParLimits(8, 0,  1);//frac
@@ -199,7 +185,6 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->SetParameters(npe,  gain,     12, offset,  inoise,  norm,  gain1,  npe,   0.05);//
     f->FixParameter(2,12);//number of dynodes
     f->FixParameter(6,gain1);//gain1
-    //f->SetParLimits(6,0.3*gain1,3*gain1);//gain1
 
     f->SetParLimits(7,0.0,3*npe);//npe1
     f->SetParLimits(8, 0,  1);//frac
@@ -210,6 +195,32 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->FixParameter(9,1);//eff 
     f->FixParameter(10,bw);//bw
     break;
+
+    //gauss * exp
+  case 6:
+    npar=13;
+    f=new TF1("spectrfit",pmtpdf_gaus_exp,xmin,xmax,npar);
+    f->SetParNames( "npe","gain","gainSpread","offset","iNoise","norm","gain1","npe1",  "frac","w",  "alpha");//,"eff","bw");
+    f->SetParameters(npe,  gain,     12, offset,  inoise,  norm,  gain1,  npe,   0.05,    0.05, gain1);//
+
+    f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
+
+    f->FixParameter(6,gain1);//gain1
+
+    f->SetParLimits(7,0.0,3*npe);//npe1
+    f->SetParLimits(8, 0,  1);//frac
+    if (npeaks==1) { 
+      f->FixParameter(7,0.01);//npe1
+      f->FixParameter(8,0);//frac
+    }
+
+    f->SetParLimits(9,0,1);//w
+    f->SetParLimits(10,0.1/gain,1./inoise);//alpha
+    f->FixParameter(11,1);//eff 
+    f->FixParameter(12,bw);//bw
+    break;
+
+
 
   }
 
@@ -243,17 +254,20 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   //  h->Fit(f,"EML","",xmin,xmax);
   h->Fit(f,"","",xmin,xmax); //simpler fit
   c->Update();
-
   //perform  new fit with a different line color, release gain1
-  //  f->SetLineColor(kBlue);
+  f->SetLineColor(kBlue);
   f->ReleaseParameter(6);
+
+  
   f->SetParLimits(6,0.3*gain1,4*gain1);//gain1
   h->Fit(f,"EML","",xmin,xmax);
+  
+
 
   cout<<"done"<<endl;
 
   //Draw
-  gStyle->SetOptFit(111);
+  gStyle->SetOptFit(1);
   h->SetMinimum(0.1);
   cout<<"drawing"<<endl;
   c->SetLogy(1);
@@ -284,7 +298,7 @@ fitscan(char* fname, double fmin=0, double fmax=1, bool forcesignal=false, int f
   // fmin,fmax are the fit limits expressed as fraction of the histogram range
 
   //get ph distribution
-  TFile *file=new TFile(fname);;
+  TFile *file=new TFile(fname);; if(file->IsOpen()==false) return nullptr;
   TCanvas* c1= (TCanvas*)gDirectory->Get("c1");
   TH1F *h = (TH1F*)c1->FindObject("ph");
   h->Rebin(2);
