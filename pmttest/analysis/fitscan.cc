@@ -201,7 +201,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     npar=13;
     f=new TF1("spectrfit",pmtpdf_gaus_exp,xmin,xmax,npar);
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","norm","gain1","npe1",  "frac","w",  "alpha");//,"eff","bw");
-    f->SetParameters(npe,  gain,     12, offset,  inoise,  norm,  gain1,  npe,   0.05,    0.05, gain1);//
+    f->SetParameters(npe,  gain,     12, offset,  inoise,  norm,  gain1,  npe,   0.05,    0.05, gain1/gain);//
 
     f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
 
@@ -214,8 +214,8 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
       f->FixParameter(8,0);//frac
     }
 
-    f->SetParLimits(9,0,1);//w
-    f->SetParLimits(10,0.1/gain,1./inoise);//alpha
+    f->FixParameter(9,0.05);
+    f->FixParameter(10,gain1/gain);
     f->FixParameter(11,1);//eff 
     f->FixParameter(12,bw);//bw
     break;
@@ -252,14 +252,23 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   // f->Draw();
   // c->cd(2);
   //  h->Fit(f,"EML","",xmin,xmax);
+
   h->Fit(f,"","",xmin,xmax); //simpler fit
   c->Update();
-  //perform  new fit with a different line color, release gain1
-  f->SetLineColor(kBlue);
-  f->ReleaseParameter(6);
+  /*
+    perform  new fit with a different line color, release gain1
 
-  
-  f->SetParLimits(6,0.3*gain1,4*gain1);//gain1
+  */
+  if (fitmodel==6){
+    f->ReleaseParameter(9);
+    f->ReleaseParameter(10);
+    f->SetParLimits(9,0,1);//w
+    f->SetParLimits(10,0.1/gain,1./inoise);//alpha
+  }else{
+    f->SetLineColor(kBlue);
+    f->ReleaseParameter(6);
+    f->SetParLimits(6,0.3*gain1,4*gain1);//gain1
+  }
   h->Fit(f,"EML","",xmin,xmax);
   
 
