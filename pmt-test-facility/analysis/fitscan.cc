@@ -1,9 +1,9 @@
 /*
   Gabriele Simi, University of Padova, 2011
 
-  A macro to extract a spectrum from a thscan of a SiPM,
+  A macro to extract a spectrum from waveforms acquired with a v1742,
   compute initial parameters for the fit function
-  and fit.
+  and fit it to the data.
   
 */
 
@@ -22,6 +22,7 @@
 #include "spectrfitf.cc"
 #include "TLegend.h"
 #include "TGraphErrors.h"
+#include "TTree.h"
 #include "waveforms.C"
 #include "spectrfitf.h"
 #include "pmtfitf.h"
@@ -444,44 +445,44 @@ mfitscan(char *dir="/data/superb/SiPM/RadHard/Feb2011LNL/"){
 /* fits a list of files passed in flist
    returns an array of double.
    The fitted values for file ifile of parametr jpar is:
-   par[ifile,jpar] = pararray[ifile*npars + 2*jpar]
-   epar[ifile,jpar] = pararray[ifile*npars + 2*jpar + 1]
+   par[ifile,jpar] = pararray[ifile][2*jpar]
+   epar[ifile,jpar] = pararray[ifile][2*jpar + 1]
 */
 
-double* mfitscan(const char * filelist="filelist.txt", const char* fitted_data="fitted_data.txt", bool forcesignal=false ){
-  ifstream list(filelist);
+double** mfitscan(const char * listfilename="filelist.txt", const char* fitted_data="fitted_data.txt", bool forcesignal=false, int fitmodel=3 ){
+  ifstream listfile(listfilename);
   vector<string> flist;
-  string s;
-  //int lines = std::count(std::istreambuf_iterator<char>( file ),std::istreambuf_iterator<char>(), '\n' ); 
-  for(int i=0;i<14; i++){
-    list>>s;
-    flist.push_back("/home/lhcb/rich-pd/pmttest/"+s);
+  string line;
+  while(getline(listfile,line)){
+    flist.push_back(line);
   }
+  listfile.close();
   ofstream out; out.open(fitted_data);
   const int nfiles(flist.size());
-  const int npars=11; //this is hardwired, should be possible to extract it from f
-  double* parmatrix = new double[nfiles*npars*2];
+  double** parmatrix = new double*[nfiles];
   for (int ifile=0;ifile<nfiles; ifile++){
     cout<<"\n"<<"file directory : "<<flist[ifile].c_str()<<endl;
-    TF1* f=fitscan((char*)flist[ifile].c_str(),5./100,1, forcesignal);
+    TF1* f=fitscan((char*)flist[ifile].c_str(),5./100,1, forcesignal, fitmodel);
     if (f==0){ cout<<"Error, fit for "<<flist[ifile].c_str()<<
 	" not found, skipping"<<endl;
       continue;}
+    double *fitpar=f->GetParameters();
+    double *fiterr=f->GetParErrors();
+    const int npars=f->GetNpar(); 
+    parmatrix[ifile]=new double[npars*2];
     if (ifile==0){
-      out<<"ifile\t"; 
+      out<<"ifile:"; 
       for(int j=0;j<npars;j++){
-	out<<f->GetParName(j)<<"\t"<<"e"<<f->GetParName(j)<<"\t";
+	out<<f->GetParName(j)<<":"<<"e"<<f->GetParName(j)<<":";
       }
-      out<<"pxNumber"<<"\t";
+      out<<"pxNumber"<<":";
       out<<"voltage"<<endl;
 
     }
-    double *fitpar=f->GetParameters();
-    double *fiterr=f->GetParErrors();
     out<<ifile<<"\t";
     for (int jpar=0;jpar<npars;jpar++){
-      parmatrix[ifile*npars+2*jpar]=fitpar[jpar];
-      parmatrix[ifile*npars+2*jpar+1]=fiterr[jpar];
+      parmatrix[ifile][2*jpar]=fitpar[jpar];
+      parmatrix[ifile][2*jpar+1]=fiterr[jpar];
       out<<fitpar[jpar]<<"\t"<<fiterr[jpar]<<"\t";
     }
     //    out<<darkrate(f,flist[ifile].c_str(),gate)<<"\t";
@@ -505,6 +506,12 @@ double* mfitscan(const char * filelist="filelist.txt", const char* fitted_data="
     if (f!=0) delete f;
     
   }
+  out.close();
   return parmatrix;
 }
 
+TTree * getTree(const char* fname="fitted_data.txt"){
+  TTree *t=new TTree;
+  t->ReadFile(fname);
+  return t;
+}
