@@ -91,13 +91,6 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   //Search for peaks to compute initial values
   //note: *** should search within fit limits ***
 
-  double rms=h->GetRMS(), mean=h->GetMean();
-  double k=0.122; //estimated from fit of gain vs HV of pixel 20
-  double alpha=0.75;//estimated from pixel 20, usually alpha=3/2
-  double gain1 = k* pow(HV*2.3/13,alpha); //2.3 is the f1=voltage_1/voltage_3, 13is the sum_i (voltage_i/voltage_3)
-  double gain=rms*rms/mean,offset=0,gainSpread=gain/sqrt(gain1),npe=mean*mean/rms/rms;
-  double inoise=2; //noise estimate in ADC counts
-
   TSpectrum pf;
   pf.Search(h,4,"nobackground",1e-3); //used to configure the fit
   pf.Print("V");
@@ -105,8 +98,21 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   printf("npeaks = %d\n",npeaks);
   float xpeak[npeaks];  for (int i=0;i<npeaks;i++) xpeak[i]=pf.GetPositionX()[i];
   sort(xpeak,xpeak+npeaks-1);
+  double offset=0.;
   if (npeaks>0) offset=xpeak[0];
-  else offset=0;
+
+  double rms=h->GetRMS(), mean=h->GetMean()-offset;
+  double k=0.122; //estimated from fit of gain vs HV of pixel 20
+  double alpha=0.75;//estimated from pixel 20, usually alpha=3/2
+  double gain1 = k* pow(HV*2.3/13,alpha); //2.3 is the f1=voltage_1/voltage_3, 13is the sum_i (voltage_i/voltage_3)
+  double gain=rms*rms/mean,gainSpread=gain/sqrt(gain1),npe=mean*mean/rms/rms;
+  TF1 ff("ff","[0]*TMath::Gaus(x,[1],[2],1)");  
+  ff.SetParameters(norm,offset,rms/5.);
+  ff.FixParameter(1,offset);
+  h->Fit(&ff,"","",offset-gain,offset+gain); 
+  double inoise=ff.GetParameter(2);
+  //  double inoise=2; //noise estimate in ADC counts
+
   
   printf("gain = %2.2f\n",gain);
   printf("offset = %2.2f\n",offset);
@@ -126,7 +132,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f=new TF1("spectrfit",fitf,xmin,xmax,npar);
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","ln_norm","ct");//,"eff","bw");
     f->SetParameters(npe,  gain,  gainSpread,  offset,    inoise,   log(norm),0.03);
-    f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
+    f->SetParLimits(2,bw/2,   gain); //ggainSpread
     f->FixParameter(6,0);//ct fixed
     f->FixParameter(7,1);//eff 
     f->FixParameter(8,bw);//bw
@@ -141,7 +147,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,0.9);//g2p
     f->SetParLimits(8,0,gain);//g2off
-    f->SetParLimits(9,bw/5,50*bw);//g2sigma
+    f->SetParLimits(9,bw/2,50*bw);//g2sigma
     f->FixParameter(10,1);//eff 
     f->FixParameter(11,bw);//bw
     break;
@@ -152,7 +158,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f=new TF1("spectrfit",pmtpdf_gaus,xmin,xmax,npar);
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","norm","gain1","npe1",  "frac");//,"eff","bw");
     f->SetParameters(npe,  gain,  gainSpread,   offset,  inoise,   norm, gain1, npe, 0.05);//
-    f->SetParLimits(2,bw/5,   4*gain); //gainSpread
+    f->SetParLimits(2,bw/2,   gain); //gainSpread
     //releasing gain1 tends to give higher gain1 values than expected from calculations
     f->FixParameter(6,gain1);//gain1
 
@@ -171,7 +177,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f=new TF1("spectrfit",pmtpdf_gaus2,xmin,xmax,npar);
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","ln_norm","ct","P","f");//,"eff","bw");
     f->SetParameters(npe,  gain,  gainSpread,  offset,   inoise,   log(norm),0.0);//,0.1,0.3 );
-    f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
+    f->SetParLimits(2,bw/2,   gain); //ggainSpread
     f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,1);
     f->SetParLimits(8,0,1);
@@ -187,7 +193,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->FixParameter(2,12);//number of dynodes
     f->FixParameter(6,gain1);//gain1
 
-    f->SetParLimits(7,0.0,3*npe);//npe1
+    f->SetParLimits(7,0.0,4*npe+1);//npe1
     f->SetParLimits(8, 0,  1);//frac
     if (npeaks==1) { 
       f->FixParameter(7,0.01);//npe1
@@ -204,11 +210,11 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->SetParNames( "npe","gain","gainSpread","offset","iNoise","norm","gain1","npe1",  "frac","w",  "alpha");//,"eff","bw");
     f->SetParameters(npe,  gain,     12, offset,  inoise,  norm,  gain1,  npe,   0.05,    0.05, gain1/gain);//
 
-    f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
+    f->SetParLimits(2,bw/2,   gain); //ggainSpread
 
     f->FixParameter(6,gain1);//gain1
 
-    f->SetParLimits(7,0.0,3*npe);//npe1
+    f->SetParLimits(7,0.0,4*npe+1);//npe1
     f->SetParLimits(8, 0,  1);//frac
     if (npeaks==1) { 
       f->FixParameter(7,0.01);//npe1
@@ -227,7 +233,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
 
   f->SetNpx(1000);
   f->SetParLimits(0,0,      3*npe); //npe
-  f->SetParLimits(1,bw,     10*gain); //gain
+  f->SetParLimits(1,bw,     4*gain); //gain
   if (npeaks==1 && forcesignal==false) { 
     f->FixParameter(0,0.01);
     f->FixParameter(1,0); 
@@ -257,7 +263,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   h->Fit(f,"","",xmin,xmax); //simpler fit
   c->Update();
   /*
-    perform  new fit with a different line color, release gain1
+    perform  new fit with a different line color, releasing some parameters
 
   */
   if (fitmodel==6){
