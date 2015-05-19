@@ -324,6 +324,13 @@ fitscan(char* fname, double fmin=0, double fmax=1, bool forcesignal=false, int f
 }
 
 
+TF1*
+drawc(TF1* f){
+
+
+  
+}
+
 
 //Draw various contributions of pmtpdf_gaus 
 TF1*
@@ -361,24 +368,23 @@ drawcontributions_gaus(TF1 *f){
 
     if(i==0){
       //condtribution of pedestal
-      phe[0] = new TF1("pedestal","[4]*[3]*((1-[6])*[5]*(0.39894228/[0])*exp(-((x-[1])*(x-[1]))/(2*[0]*[0]))+  [6]*[7]*(0.39894228/[8])*exp(-((x-[9])*(x-[9]))/(2*[8]*[8]))  )",-10,500);
-      phe[0]->SetParameter(0,sigma);
-      phe[0]->SetParameter(1,xm);
-      phe[0]->SetParameter(3,f->GetParameter("norm"));
-      phe[0]->SetParameter(4,f->GetParameter(10));//bw
-      phe[0]->SetParameter(5,probarr[i]);
-      phe[0]->SetParameter(6,f->GetParameter("frac"));
-      phe[0]->SetParameter(7,probarr2[i]);
-      phe[0]->SetParameter(8,sigma2);
-      phe[0]->SetParameter(9,xm2);
-      phe[0]->SetLineColor(i+1);
-      phe[0]->SetNpx(1000);
-      phe[0]->Draw("SAME");
+      TF1 *fnoise = (TF1*)f->Clone("fnoise");
+      phe[0]=fnoise;
+      f->Copy(*fnoise);
+      fnoise->SetLineColor(kRed);
+      fnoise->SetParameter("npe",0);
+      fnoise->SetParameter("npe1",0);
+      double frac=f->GetParameter("frac");
+      double norm=f->GetParameter("norm");
+      double prob=TMath::Poisson(0,f->GetParameter("npe"));
+      double prob1=TMath::Poisson(0,f->GetParameter("npe1"));
+      fnoise->SetParameter("norm",norm*((1-frac)*prob+frac*prob1));
+      fnoise->Draw("same");
 
     }else{
     
       //condtribution of 1, 2 and 3 phe
-      phe[i] = new TF1("phe","(1-[6])*[4]*[5]*[3]*(0.39894228/[0])*exp(-((x-[1])*(x-[1]))/(2*[0]*[0]))",-10,500);
+      phe[i] = new TF1("phe","(TMath::Sign(1,x)+1)/2.*(1-[6])*[4]*[5]*[3]*(0.39894228/[0])*exp(-((x-[1])*(x-[1]))/(2*[0]*[0]))",-10,500);
       phe[i]->SetParameter(0,sigma);
       phe[i]->SetParameter(1,xm);
       phe[i]->SetParameter(3,f->GetParameter("norm"));
@@ -391,7 +397,7 @@ drawcontributions_gaus(TF1 *f){
       phe[i]->Draw("SAME");
     
       //contribution of 1, 2 and 3 phe at 1st dynode
-      dyn[i] = new TF1("dyn","[6]*[4]*[5]*[3]*(0.39894228/[0])*exp(-((x-[1])*(x-[1]))/(2*[0]*[0]))",-10,500);
+      dyn[i] = new TF1("dyn","(TMath::Sign(1,x)+1)/2.*[6]*[4]*[5]*[3]*(0.39894228/[0])*exp(-((x-[1])*(x-[1]))/(2*[0]*[0]))",-10,500);
       dyn[i]->SetParameter(0,sigma2);
       dyn[i]->SetParameter(1,xm2);
       dyn[i]->SetParameter(3,f->GetParameter("norm"));
