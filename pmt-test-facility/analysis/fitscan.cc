@@ -324,14 +324,6 @@ fitscan(char* fname, double fmin=0, double fmax=1, bool forcesignal=false, int f
 }
 
 
-TF1*
-drawc(TF1* f){
-
-
-  
-}
-
-
 //Draw various contributions of pmtpdf_gaus 
 TF1*
 drawcontributions_gaus(TF1 *f){
