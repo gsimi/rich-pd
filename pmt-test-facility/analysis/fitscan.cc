@@ -108,7 +108,9 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   double gain=rms*rms/mean,gainSpread=gain/sqrt(gain1),npe=mean*mean/rms/rms;
   TF1 ff("ff","[0]*TMath::Gaus(x,[1],[2],1)");  
   ff.SetParameters(norm,offset,rms/5.);
+  ff.SetParLimits(0,norm/2,2*norm);
   ff.FixParameter(1,offset);
+  ff.SetParLimits(2,bw/5,rms);
   h->Fit(&ff,"","",offset-gain,offset+gain); 
   double inoise=ff.GetParameter(2);
   //  double inoise=2; //noise estimate in ADC counts
