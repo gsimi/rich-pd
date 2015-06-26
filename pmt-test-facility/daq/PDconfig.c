@@ -62,6 +62,7 @@ int ParseConfigFile(FILE *f_ini, WaveDumpConfig_t *WDcfg)
 
     WDcfg->useCorrections = -1;
     WDcfg->EventsToWrite=0;
+    WDcfg->PlotMask=0;
 
 
 	/* read config file and assign parameters */
@@ -389,6 +390,11 @@ int ParseConfigFile(FILE *f_ini, WaveDumpConfig_t *WDcfg)
 
 	if (strstr(str, "EVENTS_TO_WRITE")!=NULL) {
 	  read = fscanf(f_ini, "%d", &WDcfg->EventsToWrite);
+	  continue;
+	}
+
+	if (strstr(str, "CHANNELS_TO_PLOT")!=NULL) {
+	  read = fscanf(f_ini, "%x", &WDcfg->PlotMask);
 	  continue;
 	}
 

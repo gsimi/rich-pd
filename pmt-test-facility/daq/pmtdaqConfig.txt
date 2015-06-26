@@ -14,6 +14,11 @@
 # total number of evens to run
 EVENTS_TO_WRITE 100000
 
+# bit mask of channels to display initially on the plot
+# 0x100 is the mask for TR0
+# 0x0ff is the mask for channels 0->7
+CHANNELS_TO_PLOT 0x102
+
 # OPEN: open the digitizer
 # options: USB 0 0      Desktop/NIM digitizer through USB              
 #          USB 0 BA     VME digitizer through USB-V1718 (BA = BaseAddress of the VME board, 32 bit hex)
@@ -89,8 +94,10 @@ ENABLED_FAST_TRIGGER_DIGITIZING		YES
 ## for laser use 150ns delay
 #with 1024 samples
 POST_TRIGGER  70
+#POST_TRIGGER  0
 #with 512 samples
 #POST_TRIGGER  55
+
 
 
 # TRIGGER_EDGE: decides whether the trigger occurs on the rising or falling edge of the signal
@@ -125,7 +132,7 @@ FPIO_LEVEL  NIM
 
 # ENABLE_INPUT: enable/disable one channel (or one group in the case of the Mod 740 and Mod 742)
 # options: YES, NO
-ENABLE_INPUT          YES
+ENABLE_INPUT          NO
 
 # DC_OFFSET: DC offset adjust (DAC channel setting) in percent of the Full Scale. 
 # For model 740 and 742* the DC offset adjust is the same for all channel in the group
@@ -153,7 +160,7 @@ TRIGGER_THRESHOLD      6554
 # CHANNEL_TRIGGER: channel auto trigger settings. When enabled, the ch. auto trg. can be either 
 # propagated (ACQUISITION_AND_TRGOUT) or not (ACQUISITION_ONLY) through the TRGOUT
 # options: DISABLED, ACQUISITION_ONLY, ACQUISITION_AND_TRGOUT
-CHANNEL_TRIGGER        DISABLED
+CHANNEL_TRIGGER  ACQUISITION_ONLY
 
 # GROUP_TRG_ENABLE_MASK: this option is used only for the Models x740. These models have the
 # channels grouped 8 by 8; one group of 8 channels has a common trigger that is generated as
@@ -164,16 +171,16 @@ CHANNEL_TRIGGER        DISABLED
 ENABLE_INPUT           YES
 DC_OFFSET              0
 GRP_CH_DC_OFFSET       0,0,0,0,0,0,0,0 
-TRIGGER_THRESHOLD      100
+TRIGGER_THRESHOLD      40640
 CHANNEL_TRIGGER        ACQUISITION_ONLY
-#GROUP_TRG_ENABLE_MASK  01 
+GROUP_TRG_ENABLE_MASK  01 
 GROUP_WRITE_MASK       0x02
 
 [1]
 ENABLE_INPUT           NO
-#DC_OFFSET             0
+DC_OFFSET              0
 GRP_CH_DC_OFFSET       0,0,0,0,0,0,0,0 
-#TRIGGER_THRESHOLD      100
+TRIGGER_THRESHOLD      2565
 CHANNEL_TRIGGER        ACQUISITION_ONLY
 GROUP_TRG_ENABLE_MASK  01
 
