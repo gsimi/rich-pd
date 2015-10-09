@@ -934,6 +934,7 @@ Restart:
         printf("[s] start/stop the acquisition, [q] quit, [SPACE] help\n");
     WDrun.Restart = 0;
     PrevRateTime = get_time();
+    WDrun.ChannelPlotMask = WDcfg.PlotMask ;
     /* *************************************************************************************** */
     /* Readout Loop                                                                            */
     /* *************************************************************************************** */
