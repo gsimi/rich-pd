@@ -12,7 +12,8 @@
 [COMMON]
 
 # total number of evens to run
-EVENTS_TO_WRITE 100000
+#EVENTS_TO_WRITE 100000
+EVENTS_TO_WRITE 10000
 
 # bit mask of channels to display initially on the plot
 # 0x100 is the mask for TR0
@@ -36,8 +37,8 @@ OPEN PCI 0 0 32100000
 # 	int cellCorrection = CorrectionLevelMask & 0x1;
 #	int nsampleCorrection = (CorrectionLevelMask & 0x2) >> 1;
 #	int timeCorrection = (CorrectionLevelMask & 0x4) >> 2;
-#CORRECTION_LEVEL AUTO
 CORRECTION_LEVEL AUTO
+#CORRECTION_LEVEL 7
 
 # GNUPLOT_PATH: path to gnuplot executable file
 GNUPLOT_PATH  "/usr/bin/"
@@ -93,8 +94,9 @@ ENABLED_FAST_TRIGGER_DIGITIZING		YES
 # On models 742 there is a delay of about 35nsec on signal Fast Trigger TR; the post trigger is added to this delay  
 ## for laser use 150ns delay
 #with 1024 samples
+# use this for laser
 POST_TRIGGER  70
-#POST_TRIGGER  0
+#POST_TRIGGER  35
 #with 512 samples
 #POST_TRIGGER  55
 
@@ -157,6 +159,7 @@ DC_OFFSET              0
 # TRIGGER_THRESHOLD: Trigger Threshold is the DAC setting for the comparation level: 0 to 65535 
 TRIGGER_THRESHOLD      6554
 
+
 # CHANNEL_TRIGGER: channel auto trigger settings. When enabled, the ch. auto trg. can be either 
 # propagated (ACQUISITION_AND_TRGOUT) or not (ACQUISITION_ONLY) through the TRGOUT
 # options: DISABLED, ACQUISITION_ONLY, ACQUISITION_AND_TRGOUT
@@ -171,7 +174,8 @@ CHANNEL_TRIGGER  ACQUISITION_ONLY
 ENABLE_INPUT           YES
 DC_OFFSET              0
 GRP_CH_DC_OFFSET       0,0,0,0,0,0,0,0 
-TRIGGER_THRESHOLD      40640
+##TRIGGER_THRESHOLD      40640
+TRIGGER_THRESHOLD      0
 CHANNEL_TRIGGER        ACQUISITION_ONLY
 GROUP_TRG_ENABLE_MASK  01 
 GROUP_WRITE_MASK       0x02
@@ -263,11 +267,12 @@ GROUP_TRG_ENABLE_MASK  00
 #DC_OFFSET              31768	
 # 0V
 DC_OFFSET              32767	
+# use this for laser
 #TRIGGER_THRESHOLD      31750	
 #
 TRIGGER_THRESHOLD      22000
-#1.1V
-#TRIGGER_THRESHOLD      36044
+#0.5V with offset at 0V
+#TRIGGER_THRESHOLD      49152
 #1.2V
 #TRIGGER_THRESHOLD      39321
 

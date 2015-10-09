@@ -23,6 +23,7 @@ public:
   double integral();
   double integral2();
   double maxval();
+  double minval(int nchannels=4);
   double smoothmax(int nchannels=4);
   float time();
   bool eof(){return waves.eof();};
@@ -52,6 +53,7 @@ channel::channel(const char* f, const char *p, int npedestals){
   for (int i=0;i<rlength;i++){t[i]=i;}
   fname=f;
   calibrated=false;
+  cout<<"loading pedestals"<<endl;
   loadPedestals(p,npedestals);
   if (isbinary(fname)) {
     waves.open(fname,ios::binary);
@@ -266,6 +268,37 @@ double channel::smoothmax(int nchannels){
   return max-bkg;
 }
 
+
+double channel::minval(int nchannels){
+  if (!calibrated){
+    cout<<"error: integral on non calibrated channel"<<endl;
+    return 0;
+  }
+
+
+  double min=4096;
+  int sigmin=0; int sigmax=rlength;//attention hardcoded numbers
+  for (int i=sigmin;i<sigmax;i++) {
+    double average=0;
+    for (int j=0;j<nchannels;j++){average+=calibval[i+j];}
+    average=average/nchannels;
+    if (average<min) min=average;}
+  /* note : names are terrible: fix them */
+  return -1*min;
+
+  
+
+  // double bkg=0,max=-4096;
+  // int bkgmax=350; int sigmin=bkgmax; int sigmax=rlength;//attention hardcoded numbers
+  // for (int i=0;i<bkgmax;i++) bkg+=calibval[i];
+  // bkg=bkg/bkgmax;
+  // for (int i=sigmin;i<sigmax;i++) {if (-1*calibval[i]>max) max=-1*calibval[i];}
+  // /* note : names are terrible: fix them */
+  // return max-bkg;
+
+}
+
+
  float channel::time(){
    if (!calibrated){
      cout<<"error: integral on non calibrated channel"<<endl;
@@ -306,23 +339,43 @@ double channel::smoothmax(int nchannels){
    return t0;
  }
 
+enum algorithm{integral, integral2,maxval, smoothmax, minval};
+
 TH1F* pulseheight(const char * fdata="data/wave.01_1.txt", 
-		  const char* fpedestals="pedestals/pedestal.01_1.txt"){
+		  const char* fpedestals="pedestals/pedestal.01_1.txt", algorithm alg=integral2){
   //  channel *ch=new channel(fdata,fpedestals,10000);
   channel *ch=new channel(fdata,fpedestals);
-  TH1F *h= new TH1F("ph","pulse_height",550,-50,500);
+  //  TH1F* h = new TH1F("ph","pulse_height",550,-50,500);
+  TH1F* h = new TH1F("ph","pulse_height",2100,-52,2048);
+ 
   TH1F *t= new TH1F("t","pulse_time",550, 300,850);
   int ievent=0;
   while (!(ch->eof())){
     ch->loadNextEvent();
     ievent++;
     if (ievent%10000==0) cout<<"."<<flush;
-    float integr=ch->integral2();
-    //    float integr=ch->smoothmax(3);
+    float value=0;
+    switch (alg){
+    case integral:
+      value=ch->integral();
+      break;
+    case integral2:
+      value=ch->integral2();
+      break;
+    case maxval:
+      value=ch->maxval();
+      break;
+    case smoothmax:
+      value=ch->smoothmax();
+      break;
+    case minval:
+      value=ch->minval();
+      break;
+    }
     float time=420;
-    if (integr>4)
+    if (value>4)
       t->Fill(time=ch->time());
-    h->Fill(integr,1);
+    h->Fill(value,1);
   }
   cout<<endl;
   TCanvas *c1=new TCanvas("c1","c1",800,600);
@@ -337,7 +390,7 @@ TH1F* pulseheight(const char * fdata="data/wave.01_1.txt",
 void waveforms(){
   TH1F* h=pulseheight("data24/2/950V tune 0%.txt","data24/2/pedestal 850V.txt");
   TFile f("ph.root","update");
-  h->Write("ph1");
+  h->Write("ph");
   f.Close();
 }
 
@@ -372,3 +425,22 @@ TH1F** phsuperimposition(){
 
 }
 
+#include "TF1.h"
+#include "TCanvas.h"
+void stage(){
+  TCanvas *c=new TCanvas("c","c",800,600);
+  c->SetLogy(1);
+  TH1F* h = pulseheight("scint-coincid123-ph4-th60mV.dat","./scint-pedestal.dat",minval);
+  //  TH1F* h = pulseheight("scint-coincid123-ph4.dat","./scint-pedestal.dat",minval);
+  h->Rebin(21);
+  //  TF1 * f=new TF1("f","[4]*([0]*exp(-x/[1])/[1]  + (1-[0])*TMath::Gaus(x,[2],[3],1))",0,2000);
+  //  f->SetParNames("frac","alpha","mu","sigma","norm");
+  //  f->SetParameters(0.5,50,500,300,10000);
+
+  TF1 * f=new TF1("f","[4]*(  + (1-[0])*TMath::Gaus(x,[2],[3],1))",0,2000);
+  f->SetParNames("frac","alpha","mu","sigma","norm");
+  f->SetParameters(0.5,50,500,300,10000);
+
+  //  h->Fit(f,"l","",0,2000);
+  
+}

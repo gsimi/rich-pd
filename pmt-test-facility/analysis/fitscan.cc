@@ -64,6 +64,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   int dim=h->GetNbinsX();
   double xmin=h->GetXaxis()->GetXmin();
   double xmax=h->GetXaxis()->GetXmax();  
+  //find the actual limits of the histograms
   for (int i=0;i<dim;i++){
     double ni=h->GetBinContent(i);
     if (ni>1e-5) {
@@ -92,7 +93,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   //note: *** should search within fit limits ***
 
   TSpectrum pf;
-  pf.Search(h,4,"nobackground",1e-3); //used to configure the fit
+  pf.Search(h,4,"nobackground",5e-2); //used to configure the fit
   pf.Print("V");
   const int npeaks=pf.GetNPeaks(); 
   printf("npeaks = %d\n",npeaks);
@@ -107,7 +108,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   double gain1 = k* pow(HV*2.3/13,alpha); //2.3 is the f1=voltage_1/voltage_3, 13is the sum_i (voltage_i/voltage_3)
   double gain=rms*rms/mean,gainSpread=gain/sqrt(gain1),npe=mean*mean/rms/rms;
   TF1 ff("ff","[0]*TMath::Gaus(x,[1],[2],1)");  
-  ff.SetParameters(norm,offset,rms/5.);
+  ff.SetParameters(norm,offset,rms/25.);
   ff.SetParLimits(0,norm/2,2*norm);
   ff.FixParameter(1,offset);
   ff.SetParLimits(2,bw/5,rms);
@@ -121,7 +122,7 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
   printf("npe = %2.2f\n",npe);
   printf("gainSpread = %2.2f\n",gainSpread);
   printf("gain1 = %2.2f\n",gain1);
-
+  // return 0 ;
   //now setup the fit function
   int npar; TF1* f;
   gROOT->ProcessLine(".L ./analysis/spectrfitf.cc+");
@@ -144,7 +145,8 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     npar=12; 
     f=new TF1("spectrfit",fitf_g2,xmin,xmax,npar);
     f->SetParNames(  "npe","gain","gainSpread","offset","iNoise","ln_norm","ct","g2p","g2off","g2sigma");//,"eff","bw");    break;
-    f->SetParameters(npe,gain     ,gainSpread  ,offset       ,inoise     ,log(norm)  ,0.03, 0.1, gain/5,2/5*gainSpread);
+    gainSpread=inoise;
+    f->SetParameters(npe,gain     ,gainSpread  ,offset       ,inoise    ,log(norm)  ,0.03, 0.1, gain/5,2/5*gainSpread);
     f->SetParLimits(2,bw/5,   4*gain); //ggainSpread
     f->FixParameter(6,0);//ct fixed
     f->SetParLimits(7,0,0.9);//g2p
@@ -427,7 +429,7 @@ void
 drawcontributions_bessel(TF1* f){
   double *par=f->GetParameters();
   TF1 *phe[4];
-  TF1 *dyn[4];
+  //  TF1 *dyn[4];
   //noise
   int npar=11;
   double xmin=-50, xmax=500; //this should be extracted from the TH1F object
