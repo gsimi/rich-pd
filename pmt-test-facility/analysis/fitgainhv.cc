@@ -195,7 +195,7 @@ double
 computetheoreticalgainrms_1stoverpk(){
   double g[12];
   for (int i=0;i<12;i++){g[i]=3.2;}; 
-  g[0]=6; g[1]=3.7; g[11]=1.9; 
+  g[0]=5.7; g[1]=3.7; g[11]=1.9; 
 
   double n[13], en[13];
 

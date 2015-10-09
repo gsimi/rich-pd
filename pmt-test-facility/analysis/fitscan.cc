@@ -231,6 +231,24 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->FixParameter(12,bw);//bw
     break;
 
+  case 7:
+    npar=11;  
+    f=new TF1("spectrfit",pmtpdf_gaus_fixspread,xmin,xmax,npar);
+    f->SetParNames( "npe","gain","grms1","offset","iNoise","norm","gain1","npe1",  "frac");//,"eff","bw");
+    f->SetParameters(npe,  gain,  gainSpread,   offset,  inoise,   norm, gain1, npe, 0.05);//
+    f->SetParLimits(2,bw/2,   gain); //ggainSpread
+    //releasing gain1 tends to give higher gain1 values than expected from calculations
+    f->FixParameter(6,gain1);//gain1
+
+    f->SetParLimits(7,0.0,4*npe+1);//npe1
+    f->SetParLimits(8, 0,  1);//frac
+    if (npeaks==1) { //distribution with only noise
+      f->FixParameter(7,0.01);//npe1
+      f->FixParameter(8,0);//frac
+    }
+    f->FixParameter(9,1);//eff 
+    f->FixParameter(10,bw);//bw
+    break;
 
 
   }
