@@ -13,6 +13,6 @@ Double_t pmtwavef(Double_t* x, Double_t* par) {
   double tauf=par[2];
   double norm=par[3];
   double binw=par[4];
-  return t<t0 ? 0 : binw*(1-exp(-(t-t0)/taur))*exp(-(t-t0)/tauf);
+  return t<t0 ? 0 : norm*binw*(1-exp(-(t-t0)/taur))*exp(-(t-t0)/tauf);
 } 
 
