@@ -6,6 +6,7 @@
 #include "TFile.h"
 #include "TCanvas.h"
 #include "TF1.h"
+#include "pmtwavef.cc"
 using namespace::std;
 
 class channel{
@@ -67,6 +68,7 @@ channel::channel(const char* f, const char *p, int npedestals){
   else {
     waves.open(fname);
     binaryfile=false;}
+  fitf=new TF1("pmt wavefunction fit",pmtwavef,0,1024,5);
 }
 
 bool channel::isbinary(const char *f){
