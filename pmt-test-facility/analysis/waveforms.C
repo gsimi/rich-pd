@@ -27,7 +27,7 @@ public:
   double maxval(int bkgmax=350);
   double minval(int nchannels=4);
   double smoothmax(int nchannels=4);
-  void fit(double bw);
+  void fit();
   float fitted_time(){return fitf->GetParameter(0);}
   float fitted_ph(){return fitf->GetParameter(3);}
   float time(bool negative=false, int bkgmax=0, int sigmmax=1024);
@@ -292,7 +292,7 @@ double channel::minval(int nchannels){
   
 }
 
-void channel::fit(double bw){
+void channel::fit(){
   TGraph *g=new TGraph(rlength,t,calibval);
   fitf->SetParameters(420,5,100,1e3,1);
   g->Fit(fitf,"","",0,1024);
@@ -345,7 +345,7 @@ float channel::time(bool negative, int bkgmax, int sigmax ){
    return t0;
  }
 
-enum algorithm{integral, integral2,maxval, smoothmax, minval, time};
+enum algorithm{integral, integral2,maxval, smoothmax, minval, fit};
 float getvalue(channel* ch, algorithm alg){
   float value=-999;
   switch (alg){
@@ -365,9 +365,9 @@ float getvalue(channel* ch, algorithm alg){
     value = ch->minval();
     break;
   case fit:
-      ch->fit(bw);
-      value=ch->fitted_ph();
-    }
+    ch->fit();
+    value=ch->fitted_ph();
+    break;
   }
   return value;
 }
