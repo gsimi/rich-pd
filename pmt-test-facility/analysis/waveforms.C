@@ -4,6 +4,7 @@
 #include "TH1F.h"
 #include "TFile.h"
 #include "TCanvas.h"
+#include "TF1.h"
 using namespace::std;
 
 class channel{
@@ -25,6 +26,9 @@ public:
   double maxval();
   double minval(int nchannels=4);
   double smoothmax(int nchannels=4);
+  void fit(double bw);
+  float fitted_time(){return fitf->GetParameter(0);}
+  float fitted_ph(){return fitf->GetParameter(3);}
   float time();
   bool eof(){return waves.eof();};
   bool isbinary(const char *fname);
@@ -42,6 +46,7 @@ private:
   bool calibrated;
   ifstream waves;
   bool binaryfile;
+  TF1* fitf;
 };
 channel::channel(const char* f, const char *p, int npedestals){
   rlength=1024;
@@ -298,6 +303,12 @@ double channel::minval(int nchannels){
 
 }
 
+void channel::fit(double bw){
+  TGraph *g=new TGraph(rlength,t,calibval);
+  fitf->SetParameters(420,5,100,1e3,1);
+  g->Fit(fitf,"","",0,1024);
+  
+}
 
  float channel::time(){
    if (!calibrated){
@@ -371,6 +382,10 @@ TH1F* pulseheight(const char * fdata="data/wave.01_1.txt",
     case minval:
       value=ch->minval();
       break;
+    case fit:
+      ch->fit(bw);
+      value=ch->fitted_ph();
+      time=ch->fitted_time();
     }
     float time=420;
     if (value>4)
