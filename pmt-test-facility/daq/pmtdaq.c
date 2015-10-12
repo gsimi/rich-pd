@@ -629,6 +629,7 @@ int WriteOutputFilesx742(WaveDumpConfig_t *WDcfg, WaveDumpRun_t *WDrun, CAEN_DGT
 				if (Size <= 0) {
 					continue;
 				}
+				//				printf("gr=%d grwritemask=0x%x\n",gr,WDcfg->GroupWriteMask[gr]);
 				if (!(WDcfg->GroupWriteMask[gr] & 1<<ch) )  continue;
 				// Check the file format type
 				if( WDcfg->OutFileFlags& OFF_BINARY) {
@@ -640,6 +641,7 @@ int WriteOutputFilesx742(WaveDumpConfig_t *WDcfg, WaveDumpRun_t *WDrun, CAEN_DGT
 					BinHeader[3] = ch;
 					BinHeader[4] = EventInfo->EventCounter;
 					BinHeader[5] = EventInfo->TriggerTimeTag;
+					//					printf("gr=%d ch=%d\n",gr,ch);
 					if (!WDrun->fout[(gr*9+ch)]) {
 						char fname[100];
 						if ((gr*9+ch) == 8) {
@@ -684,6 +686,19 @@ int WriteOutputFilesx742(WaveDumpConfig_t *WDcfg, WaveDumpRun_t *WDrun, CAEN_DGT
 						fclose(WDrun->fout[(gr*9+ch)]);
 						WDrun->fout[(gr*9+ch)]= NULL;
 						return -1;
+					}
+					//if bit 9 is 1 then write trigger data into the data stream 
+					int trgch=8;
+					if  (WDcfg->GroupWriteMask[gr] & 0x200) {
+					  printf("writing trg in data stream\n");
+					  ns = (int)fwrite( Event->DataGroup[gr].DataChannel[trgch] , 1 , Size*4, WDrun->fout[(gr*9+ch)]) / 4;
+					  if (ns != Size) {
+					    // error writing to file
+					    fclose(WDrun->fout[(gr*9+ch)]);
+					    WDrun->fout[(gr*9+ch)]= NULL;
+					    return -1;
+					  }
+					  
 					}
 				} else {
 					// Ascii file format

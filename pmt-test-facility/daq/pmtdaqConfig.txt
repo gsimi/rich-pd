@@ -12,8 +12,8 @@
 [COMMON]
 
 # total number of evens to run
-#EVENTS_TO_WRITE 100000
-EVENTS_TO_WRITE 10000
+EVENTS_TO_WRITE 100000
+#EVENTS_TO_WRITE 10000
 
 # bit mask of channels to display initially on the plot
 # 0x100 is the mask for TR0
@@ -95,8 +95,8 @@ ENABLED_FAST_TRIGGER_DIGITIZING		YES
 ## for laser use 150ns delay
 #with 1024 samples
 # use this for laser
-POST_TRIGGER  70
-#POST_TRIGGER  35
+#POST_TRIGGER  70
+POST_TRIGGER  60
 #with 512 samples
 #POST_TRIGGER  55
 
@@ -178,7 +178,9 @@ GRP_CH_DC_OFFSET       0,0,0,0,0,0,0,0
 TRIGGER_THRESHOLD      0
 CHANNEL_TRIGGER        ACQUISITION_ONLY
 GROUP_TRG_ENABLE_MASK  01 
-GROUP_WRITE_MASK       0x02
+# bug fixed in CAEN code, GroupWriteMask chanded from 8bit int to 1bit int to include trigger bit 0x100
+# customized bit 0x200 forces the sysem to write the trigger and the channel data into the same stream
+GROUP_WRITE_MASK       0x202
 
 [1]
 ENABLE_INPUT           NO
@@ -270,9 +272,9 @@ DC_OFFSET              32767
 # use this for laser
 #TRIGGER_THRESHOLD      31750	
 #
-TRIGGER_THRESHOLD      22000
+#TRIGGER_THRESHOLD      22000
 #0.5V with offset at 0V
-#TRIGGER_THRESHOLD      49152
+TRIGGER_THRESHOLD      49152
 #1.2V
 #TRIGGER_THRESHOLD      39321
 
