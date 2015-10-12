@@ -297,6 +297,7 @@ double channel::minval(int nchannels){
 void channel::fit(){
   TGraph *g=new TGraph(rlength,t,calibval);
   fitf->SetParameters(420,5,100,1e3,1);
+  fitf->FixParameter(4,1);//bw
   g->Fit(fitf,"Q","",0,1024);
   
 }
