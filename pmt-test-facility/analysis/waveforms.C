@@ -7,6 +7,7 @@
 #include "TCanvas.h"
 #include "TF1.h"
 #include "pmtwavef.cc"
+#include "TMinuit.h"
 using namespace::std;
 
 class channel{
@@ -29,8 +30,8 @@ public:
   double minval(int nchannels=4);
   double smoothmax(int nchannels=4);
   TGraph* fit();
-  float fitted_time(){return fitf->GetParameter(0);}
-  float fitted_ph(){return fitf->GetParameter(3);}
+  float fitted_time(){return fitf->GetParameter("t0");}
+  float fitted_ph(){return fitf->GetParameter("norm");}
   float time(bool negative=false, int bkgmax=0, int sigmmax=1024);
   bool eof(){return waves.eof();};
   bool isbinary(const char *fname);
@@ -68,7 +69,8 @@ channel::channel(const char* f, const char *p, int npedestals){
   else {
     waves.open(fname);
     binaryfile=false;}
-  fitf=new TF1("pmt wavefunction fit",pmtwavef,0,1024,6);
+  fitf=new TF1("pmtwavef",pmtwavef,0,1024,6);
+  fitf->SetParNames("t0","tau_r","tau_f","ped","norm","bw");
 }
 
 bool channel::isbinary(const char *f){
@@ -296,7 +298,7 @@ double channel::minval(int nchannels){
 
 TGraph* channel::fit(){
   TGraph *g=new TGraph(rlength,t,calibval);
-  fitf->SetParameters(420,5,100,0,1e3,1);
+  fitf->SetParameters(420,5,100,0,2e4,1);
   fitf->FixParameter(5,1);//bw
   g->Fit(fitf,"Q","",0,1024);
   return g;  
@@ -369,7 +371,10 @@ float getvalue(channel* ch, algorithm alg){
     break;
   case fit:
     ch->fit();
-    value=ch->fitted_ph();
+    if (gMinuit->fCstatu == "CONVERGED ")
+      value=ch->fitted_ph()/100; //normalize to fit the histogram limits
+    else
+      value=0;
     break;
   }
   return value;
@@ -387,9 +392,11 @@ TH1F* pulseheight(const char * fdata="data/wave.01_1.txt",
     if (ievent%10000==0) cout<<"."<<flush;
     float value=getvalue(ch,alg);
     float time=alg!=fit? ch->time(negative) : ch->fitted_time() ;
-    t->Fill(time);
-    if (tmin<time && time<tmax)
-      h->Fill(value,1);
+    if (gMinuit->fCstatu == "CONVERGED ")
+      t->Fill(time);{
+      if (tmin<time && time<tmax)
+	h->Fill(value,1);
+    }
   }
   cout<<endl;
   //  TCanvas *c1=new TCanvas("c1","c1",800,600);
