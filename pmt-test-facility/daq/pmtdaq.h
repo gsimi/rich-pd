@@ -123,7 +123,7 @@ typedef struct WaveDumpConfig_t {
 
     int useCorrections;
   // additional congfiguration for test stand
-    uint8_t GroupWriteMask[MAX_SET];
+    uint16_t GroupWriteMask[MAX_SET];
   int EventsToWrite;
   uint32_t PlotMask;
 

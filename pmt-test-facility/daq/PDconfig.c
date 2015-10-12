@@ -382,9 +382,9 @@ int ParseConfigFile(FILE *f_ini, WaveDumpConfig_t *WDcfg)
 	  read = fscanf(f_ini, "%x", &val);
 	  if (ch == -1)
 	    for(i=0; i<MAX_SET; i++)
-	      WDcfg->GroupWriteMask[i] = val & 0xFF;
+	      WDcfg->GroupWriteMask[i] = val & 0xFFFF;
 	  else
-	    WDcfg->GroupWriteMask[ch] = val & 0xFF;
+	    WDcfg->GroupWriteMask[ch] = val & 0xFFFF;
 	  continue;
 	}
 
