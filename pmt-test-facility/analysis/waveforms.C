@@ -28,7 +28,7 @@ public:
   double maxval(int bkgmax=350);
   double minval(int nchannels=4);
   double smoothmax(int nchannels=4);
-  void fit();
+  TGraph* fit();
   float fitted_time(){return fitf->GetParameter(0);}
   float fitted_ph(){return fitf->GetParameter(3);}
   float time(bool negative=false, int bkgmax=0, int sigmmax=1024);
@@ -68,7 +68,7 @@ channel::channel(const char* f, const char *p, int npedestals){
   else {
     waves.open(fname);
     binaryfile=false;}
-  fitf=new TF1("pmt wavefunction fit",pmtwavef,0,1024,5);
+  fitf=new TF1("pmt wavefunction fit",pmtwavef,0,1024,6);
 }
 
 bool channel::isbinary(const char *f){
@@ -294,12 +294,12 @@ double channel::minval(int nchannels){
   
 }
 
-void channel::fit(){
+TGraph* channel::fit(){
   TGraph *g=new TGraph(rlength,t,calibval);
-  fitf->SetParameters(420,5,100,1e3,1);
-  fitf->FixParameter(4,1);//bw
+  fitf->SetParameters(420,5,100,0,1e3,1);
+  fitf->FixParameter(5,1);//bw
   g->Fit(fitf,"Q","",0,1024);
-  
+  return g;  
 }
 
 float channel::time(bool negative, int bkgmax, int sigmax ){
