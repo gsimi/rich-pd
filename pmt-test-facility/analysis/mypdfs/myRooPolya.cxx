@@ -15,7 +15,7 @@
 
 #include <iostream> 
 
-#include "myRooPolya.h" 
+#include "mypdfs/myRooPolya.h" 
 #include "RooAbsReal.h" 
 #include "RooAbsCategory.h" 
 
@@ -34,15 +34,13 @@ ClassImp(myRooPolya)
 myRooPolya::myRooPolya(const char *name, const char *title, 
 		       RooAbsReal& _x,
 		       RooAbsReal& _x0,
-		       RooAbsReal& _sigma,
 		       RooAbsReal& _mean,
-		       Bool_t noRounding) :
+		       RooAbsReal& _b) :
   RooAbsPdf(name,title), 
   x("x","x",this,_x),
   x0("x0","x0",this,_x0),
-  sigma("sigma","sigma",this,_sigma),
   mean("mean","mean",this,_mean),
-  _noRounding(noRounding),
+  b("b","b",this,_b),
   _protectNegative(false)
 { 
   // Constructor  
@@ -55,9 +53,8 @@ myRooPolya::myRooPolya(const char *name, const char *title,
    RooAbsPdf(other,name), 
    x("x",this,other.x),
    x0("x0",this,other.x0),
-   sigma("sigma",this,other.sigma),
    mean("mean",this,other.mean),
-   _noRounding(other._noRounding),
+   b("b",this,other.b),
    _protectNegative(other._protectNegative)
 { 
    // Copy constructor
@@ -71,10 +68,9 @@ Double_t myRooPolya::evaluate() const
 { 
   // Implementation in terms of the TMath Polya function
 
-  Double_t k = _noRounding ? (x-x0)/sigma : floor((x-x0)/sigma);  
   if(_protectNegative && mean<0) 
     return 1e-3;
-  return TMath::Polya(k,mean) ;
+  return ROOT::Math::negative_binomial_pdf(x-x0,1/(1+mean*b),b) ;
 } 
 
 
@@ -100,50 +96,23 @@ Double_t myRooPolya::analyticalIntegral(Int_t code, const char* rangeName) const
 
   // Implement integral over x as summation. Add special handling in case
   // range boundaries are not on integer values of x
-  Double_t xmin = (x.min(rangeName) - x0)/sigma;
-  Double_t xmax = (x.max(rangeName) - x0)/sigma;
+  Double_t xmin = (x.min(rangeName) - x0);
+  Double_t xmax = (x.max(rangeName) - x0);
 
   // Protect against negative lower boundaries
   if (xmin<0) xmin=0 ;
-
-  Int_t ixmin = Int_t (xmin) ;
-  Int_t ixmax = Int_t (xmax)+1 ;
-
-  Double_t fracLoBin = 1-(xmin-ixmin) ;
-  Double_t fracHiBin = 1-(ixmax-xmax) ;
-
-  if (!x.hasMax()) {
+  
+  double val=0;
+  if (!x.hasMax() || RooNumber::isInfinite(xmax)) {
     if (xmin<1e-6) {
       return 1 ;
     } else {
-      
-      // Return 1 minus integral from 0 to x.min() 
-
-      if(ixmin == 0){ // first bin
-	return TMath::Polya(0, mean)*(xmin-0);
-      }      
-      Double_t sum(0) ;
-      sum += TMath::Polya(0,mean)*fracLoBin ;
-      sum+= ROOT::Math::poisson_cdf(ixmin-2, mean) - ROOT::Math::poisson_cdf(0,mean) ;
-      sum += TMath::Polya(ixmin-1,mean)*fracHiBin ;
-      return 1-sum ;
+      val = 1-ROOT::Math::negative_binomial_cdf_c(x-x0,1./(1+mean*b),1./b);
     }
+  } else{
+    val = ROOT::Math::negative_binomial_cdf(x-x0,1./(1+mean*b),1./b);
   }
-  
-  if(ixmin == ixmax-1){ // first bin
-    return TMath::Polya(ixmin, mean)*(xmax-xmin);
-  }  
-
-  Double_t sum(0) ;
-  sum += TMath::Polya(ixmin,mean)*fracLoBin ;
-  if (RooNumber::isInfinite(xmax)){
-    sum+= 1.-ROOT::Math::poisson_cdf(ixmin,mean) ;
-  }  else {
-    sum+= ROOT::Math::poisson_cdf(ixmax-2, mean) - ROOT::Math::poisson_cdf(ixmin,mean) ;
-    sum += TMath::Polya(ixmax-1,mean)*fracHiBin ;
-  }
-  
-  return sum ;
+  return val ;
 
 }
 

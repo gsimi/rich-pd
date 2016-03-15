@@ -35,6 +35,7 @@
 #include "mypdfs/myRooGamma.h"
 #include "mypdfs/MyExp.h"
 #include "mypdfs/myRooPoisson.h"
+#include "TROOT.h"
 using namespace RooFit ;
 
 /* TODO: io farei una bella classe... poi fai te!
@@ -46,7 +47,7 @@ using namespace RooFit ;
 
 // Fwd declaration
 void dofit( TString, TString, Int_t );
-RooFitResult* getFit(TString, TString);
+RooFitResult* getFit(TH1F*, TString, Int_t );
 void loadHamamatsuGain( TString serialNo );
 void loadChannelMap( );
 
@@ -91,6 +92,14 @@ void multigauss( TString dataFile,
   // runs on pixel 12, if available
   // .x multigauss.C(-1)
   // runs on all the available pixels
+
+  //Load Libs: TODO make a compiled dynamically loaded library
+  /* 
+     gROOT->ProcessLine(".L mypdfs/myRooGamma.cxx+");
+     gROOT->ProcessLine(".L mypdfs/myRooPoisson.cxx+");
+     gROOT->ProcessLine(".L mypdfs/myRooPolya.cxx+");
+  */
+
 
   // Get Hamamatsu gains
   loadHamamatsuGain( serialNo );
@@ -280,11 +289,12 @@ void dofit( TString dataFile,
   cout << "Analyzing data file: " << dataFile << "..." << endl;
   cout << "Number of events: " << nEvents << endl;
 
-  RooFitResult* result =  getFit(hh,lab);
+  RooFitResult* result =  getFit(hh,lab, pxID);
 }
   
 RooFitResult* getFit( TH1F *hh,
-                     TString lab = "Padova")
+		      TString lab,
+		      int pxID)
 {
 
   Int_t dump_pdf_output = 1;
@@ -311,7 +321,7 @@ RooFitResult* getFit( TH1F *hh,
   TSpectrum *s = new TSpectrum(4);
   Int_t npeaks = s->Search(hh,4," ",5e-4); // used to configure the Search 
   cout << "Found " << npeaks << " candidate peaks !" << endl;
-  Float_t *xpeaks = s->GetPositionX();
+  Double_t *xpeaks = s->GetPositionX();
   for (Int_t p=0;p<npeaks;p++) {
     x_peaks[p] = static_cast<Double_t>(xpeaks[p]);
     Int_t bin = hh->GetXaxis()->FindBin(x_peaks[p]);
@@ -341,7 +351,7 @@ RooFitResult* getFit( TH1F *hh,
   TSpectrum *swap = new TSpectrum(2);
   npeaks = swap->Search(hhswap,2," ",1e-6); // used to configure the Search
   cout << "Found " << npeaks << " <<swapped>> candidate peaks !" << endl;
-  Float_t *xswap = swap->GetPositionX();
+  Double_t *xswap = swap->GetPositionX();
   for (Int_t ps=0;ps<2;ps++) {
     x_swap[ps] = static_cast<Double_t>(xswap[ps]);
     Int_t bin = hhswap->GetXaxis()->FindBin(x_swap[ps]);
@@ -443,11 +453,11 @@ RooFitResult* getFit( TH1F *hh,
 	RooAbsPdf *gauss = new RooGaussian(name, title, x, *mean, *sigma); 
 
 	name.Form("T%i_%i", ns, nct); // tail gaussian
-	TString title; title.Form("Gaussian tail component %i-%i", ns, nct);
+        title.Form("Gaussian tail component %i-%i", ns, nct);
 	RooAbsPdf *tail = new RooGaussian(name, title, x, *mean, *sigma_tail); 
       
 	name.Form("S%i_%i", ns, nct); // gauss + tail
-	TString title; title.Form("signal component %i-%i", ns, nct);
+	title.Form("signal component %i-%i", ns, nct);
 	RooAbsPdf *signal;
 	if (usetail)
 	  signal=new RooAddPdf(name,title,RooArgList(*gauss,*tail),RooArgList(*frac_tail));
@@ -554,8 +564,8 @@ RooFitResult* getFit( TH1F *hh,
   // model.fitTo(dh,Range("R1,R2")) ;
   model.fitTo(dh) ;
   if (multistagefit){
-    sigma_n->setConstant(true);
-    mean_n->setConstant(true);
+    sigma_n.setConstant(true);
+    mean_n.setConstant(true);
     x.setRange("R2",30,200);
     model.fitTo(dh,Range("R2")) ;
   }
@@ -609,28 +619,28 @@ RooFitResult* getFit( TH1F *hh,
   m_chi2[pxID -1] = frame->chiSquare();
 
   m_npe[pxID -1] = npe.getVal();
-  m_dnpe[pxID -1] = npe.getError();
+  m_dnpe[pxID -1] = npe.getPropagatedError(*fitres);
 
   m_npe_ct[pxID -1] = npe_ct.getVal();
-  m_dnpe_ct[pxID -1] = npe_ct.getError();
+  m_dnpe_ct[pxID -1] = npe_ct.getPropagatedError(*fitres);
   
   m_mean_n[pxID -1] = mean_n.getVal();
-  m_dmean_n[pxID -1] = mean_n.getError();
+  m_dmean_n[pxID -1] = mean_n.getPropagatedError(*fitres);
   
   m_sigma_n[pxID -1] = sigma_n.getVal();
-  m_dsigma_n[pxID -1] = sigma_n.getError();
+  m_dsigma_n[pxID -1] = sigma_n.getPropagatedError(*fitres);
 
   m_mean_1pe[pxID -1] = mean_1pe.getVal();
-  m_dmean_1pe[pxID -1] = mean_1pe.getError();
+  m_dmean_1pe[pxID -1] = mean_1pe.getPropagatedError(*fitres);
 
   m_sigma_1pe[pxID -1] = sigma_1pe.getVal();
-  m_dsigma_1pe[pxID -1] = sigma_1pe.getError();
+  m_dsigma_1pe[pxID -1] = sigma_1pe.getPropagatedError(*fitres);
 
   m_mean_1pe_ct[pxID -1] = mean_1pe_ct.getVal();
-  m_dmean_1pe_ct[pxID -1] = mean_1pe_ct.getError();
+  m_dmean_1pe_ct[pxID -1] = mean_1pe_ct.getPropagatedError(*fitres);
 
   m_sigma_1pe_ct[pxID -1] = sigma_1pe_ct.getVal();
-  m_dsigma_1pe_ct[pxID -1] = sigma_1pe_ct.getError();
+  m_dsigma_1pe_ct[pxID -1] = sigma_1pe_ct.getPropagatedError(*fitres);
 
   return fitres;
 }
