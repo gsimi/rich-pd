@@ -626,6 +626,8 @@ Double_t pmtpdf_besselg1adc(Double_t* x, Double_t* par){
    lead to bad normalization.
  */
 
+using namespace::std;
+
 TF1* 
 testpmtpdf(double mean_pe=0.5, double G=50, int ndynodes=12, 
 	   double ped=0, double noise=5, double norm=1e6, 
@@ -673,3 +675,62 @@ testpmtpdf(double mean_pe=0.5, double G=50, int ndynodes=12,
   return fg;
 }
 
+
+Double_t silviapdf(Double_t* x, Double_t* par) {
+  /*===========================================================
+    par0 = fraciton of signal
+    par1 = signal exp factor 
+    par2 = signal gain	     
+    par3 = noise exp factor  
+    par4 = noise pedestal    
+    par5 = normalization     
+    par6 = poisson mean npe
+    par7 = bin width         
+    ===========================================================*/
+  double mean_pe=par[0];//poisson mean
+  double gain=par[1]; //	signal gain	     
+  double cs=par[2];  // signal exp factor 
+  double ped=par[3]; //	noise pedestal    
+  double cb=par[4];  //	noise exp factor  
+  double norm=par[5];//	normalization
+  double f1=par[6];// fraction of conversion on 1st dynode
+  double bw=par[7];  //	bin width         
+  double t=*x; //pulse height
+  
+  //signal: sum of 4 derivatives of a fermi function 1/(1+exp(-c*x))
+  int nmax=4;
+  double sigkpdf = 0;
+  for (int n=1; n<nmax; n++){//n is the number of photoelectrons
+    double csn=cs/sqrt(n);
+    sigkpdf += TMath::Poisson(n,mean_pe)*
+      csn* exp(-csn*(-t+n*gain+ped))/pow(1+ exp(-csn*(-t+n*gain+ped)),2) ;
+  }
+  
+  //conversions of 1st dynode
+  double sig1pdf = 0;
+  double gain1=gain/5.7; //gain for conversions on 1st dynode
+  for (int n=1; n<nmax; n++){//n is the number of photoelectrons
+    double csn=cs/sqrt(n*gain1/gain);    
+    sig1pdf += TMath::Poisson(n,mean_pe)*
+      csn* exp(-csn*(-t+n*gain1+ped))/pow(1+ exp(-csn*(-t+n*gain1+ped)),2) ;
+  }
+
+  //signal pdf
+  double sigpdf=(1-f1)*sigkpdf+f1*sig1pdf;
+  
+  //noise pdf
+  double bkgpdf = TMath::Poisson(0,mean_pe)*cb* exp(-cb*(-t +ped))/pow(1+ exp(-cb*(-t +ped)),2) ;
+  
+  return norm*bw*( sigpdf + bkgpdf);
+  
+}
+
+
+
+TF1* testsilviapdf(){
+  TF1* ff=new TF1("sliviafit",silviapdf,2,200,7);
+  ff->SetParNames( "cs",             "G","f_s","ped" , "cb",     "norm","bw");
+  ff->SetParameters(1./40,40,0.5,0,1./5,1e5,2);
+  ff->Draw();
+  return ff;
+}
