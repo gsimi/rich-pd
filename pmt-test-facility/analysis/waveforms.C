@@ -1,78 +1,151 @@
 //1;3409;0c
 #include "TGraph.h"
+#include "TGraphErrors.h"
 #include <iostream>
 #include <fstream>
+#include <math.h>
 #include "TH1F.h"
 #include "TFile.h"
+#include "TTree.h"
 #include "TCanvas.h"
 #include "TF1.h"
 #include "pmtwavef.cc"
 #include "TMinuit.h"
 using namespace::std;
 
-class channel{
+
+
+
+//===================================================
+// Channel class
+//===================================================
+class channel
+{
 public:
-  channel(const char* f="data/wave_1.txt", const char* p="pedestals/wave_1.txt",int npedestals=0);
-  // ~channel(){if (pedestals!=0) delete pedestals; waves.close();}
-  void loadPedestals(const char* pedestalFile="pedestals/wave_1.txt", int npedestals=0);
+  // Number of records in the channel 
+  const static int rlength = 1024;
+
+  // Constructor and destructor 
+  channel(const char* fData, 
+          const char* fPed, 
+          int nPed = 0);
+  channel() {};
+  ~channel() {};
+
+  // Set channel according to input
+  void setChannel(const char* fData, 
+                  const char *fPed, 
+                  int nPed);
+
+  // Load pedestals 
+  void loadPedestals(const char* fPed, int nPed = 0);
+  
+  // Load next event 
   void loadNextEvent();
-  void loadEvent(int index=0);
-  //functions return ownershi to the user
+ 
+  // Load an event 
+  void loadEvent(int index = 0);
+  
+  // Plot functions
   TGraph* plot(int index);
   TGraph* plot();
   TGraph* plotNext();
   TGraph* plotRaw();
   TGraph* plotPedestal();
-  //various ways to compute estimate height
-  double integral(int sigmin=350);
-  double integral2(int bkgmax=350);
-  double maxval(int bkgmax=350);
-  double minval(int nchannels=4);
-  double smoothmax(int nchannels=4);
-  TGraph* fit();
-  float fitted_time(){return fitf->GetParameter("t0");}
-  float fitted_ph(){return fitf->GetParameter("norm");}
-  float time(bool negative=false, int bkgmax=0, int sigmmax=1024);
-  bool eof(){return waves.eof();};
+  
+  // Various ways to compute estimate height
+  double integral (int sigmin = 200);
+  double integral2 (int bkgmax = 200, int sigmax = rlength);
+  double maxval (int bkgmax = 200);
+  double minval (int nchannels = 4);
+  double smoothmax (int nchannels = 4);
+   
+  // Fit wave using a user-defined function
+  bool fit(TF1 *fun, int min = 0, int max = rlength);
+
+  // Returns time
+  float time(bool negative = false, int bkgmax = 0, int sigmmax = rlength);
+  
+  // Returns end-of-file 
+  bool eof() { return waves.eof(); }
+
+  // Returns if it's a binary file 
   bool isbinary(const char *fname);
+  
+  // Read a single float from stream 
   void readfloat(ifstream &is, float& val, bool binary);
+
+  // Returns pedestals
+  float* Pedestals() { return pedestals; }
+  //float Pedestals (unsigned idx) { return pedestals[idx]; }
+  
+  // Returns raw values
+  float* Rawval() { return rawval; }
+  
+  // Returns calibrated values
+  float* Calibval() { return calibval; }
+  
+  // Returns times
+  float* T() { return t; }
+
+
 private:
-  //private functions
+  // Private functions
   void calibrate();
-  //data members
-  int rlength;
-  float *pedestals;
-  float *rawval;
-  float *calibval;
-  float *t;
+
+  // Data members
+  float pedestals[rlength];
+  float rawval[rlength];
+  float calibval[rlength];
+  float t[rlength];
   const char* fname;
   bool calibrated;
   ifstream waves;
   bool binaryfile;
-  TF1* fitf;
 };
-channel::channel(const char* f, const char *p, int npedestals){
-  rlength=1024;
-  //initialize arrays
-  pedestals=new float[rlength];
-  rawval=new float[rlength];
-  calibval=new float[rlength];
-  t=new float[rlength];
-  for (int i=0;i<rlength;i++){t[i]=i;}
-  fname=f;
-  calibrated=false;
-  cout<<"loading pedestals"<<endl;
-  loadPedestals(p,npedestals);
-  if (isbinary(fname)) {
-    waves.open(fname,ios::binary);
-    binaryfile=true;}
-  else {
-    waves.open(fname);
-    binaryfile=false;}
-  fitf=new TF1("pmtwavef",pmtwavef,0,1024,6);
-  fitf->SetParNames("t0","tau_r","tau_f","ped","norm","bw");
+
+
+//===================================
+// Constructor
+//===================================
+channel::channel(const char* fData, const char *fPed, int nPed)
+{
+  setChannel(fData, fPed, nPed);
 }
 
+
+//===================================
+// Set channel 
+//===================================
+void channel::setChannel(const char* fData, const char *fPed, int nPed)
+{
+  fname = fData;
+  calibrated = false;
+
+  // Reset arrays
+  for (int i=0; i < rlength; i++) {
+    pedestals[i] = rawval[i] = calibval[i] = 0.0;
+    t[i] = i;
+  }
+ 
+  // Load pedestal
+  cout << "loading pedestals" << endl;
+  loadPedestals(fPed, nPed);
+
+  // Open input data file 
+  if (isbinary(fname)) {
+    waves.open(fname,ios::binary);
+    binaryfile = true;
+  }
+  else {
+    waves.open(fname);
+    binaryfile = false;
+  }
+}
+
+//===================================
+// Returns true if inputfile is binary 
+//===================================
 bool channel::isbinary(const char *f){
   string fs(f);
   bool bin = false;  
@@ -80,6 +153,10 @@ bool channel::isbinary(const char *f){
   return bin;
 }
 
+
+//===================================
+// Read a float from data
+//===================================
 void channel::readfloat(ifstream &is, float &pVal, bool binary){
   if (binary){
     static char ch[sizeof(float)];//ch is shared between calls of readfloat
@@ -91,8 +168,13 @@ void channel::readfloat(ifstream &is, float &pVal, bool binary){
     is>>pVal;
 }
 
+
+//===================================
+// Load next event 
+//===================================
 void channel::loadNextEvent(){
   if (!waves.good()){cout<<"error opening file"<<endl; return;}
+
   for (int i=0;i<rlength;i++){
     readfloat(waves,rawval[i], binaryfile);
     //debug
@@ -105,11 +187,15 @@ void channel::loadNextEvent(){
       break;
     }
   }
+
   calibrate();
   calibrated=true;
 }
 
 
+//===================================
+// Load event reading channel #index
+//===================================
 void channel::loadEvent(int index){
   ifstream tmpwaves;
   if (binaryfile)
@@ -136,32 +222,52 @@ void channel::loadEvent(int index){
 
   //apply pedestal subtraction
   calibrate();
-  calibrated=true;
+  calibrated = true;
   tmpwaves.close();
 }
 
-TGraph* channel::plot(int index){
+
+//===================================
+// Plot a specific event 
+//===================================
+TGraph* channel::plot(int index) {
   loadEvent(index);
   return plot();
 }
 
-TGraph* channel::plot(){
-  TGraph *g=new TGraph(rlength,t,calibval);
+
+//===================================
+// Plot calibration values 
+//===================================
+TGraph* channel::plot() {
+  TGraph *g = new TGraph(rlength, t, calibval);
   g->Draw("APL");
   return g;
 }
 
-TGraph* channel::plotNext(){
+
+//===================================
+// Plot next event
+//===================================
+TGraph* channel::plotNext() {
   loadNextEvent();
   return plot();
 }
 
+
+//===================================
+// Plot raw values
+//===================================
 TGraph* channel::plotRaw(){
   TGraph *g=new TGraph(rlength,t,rawval);
   g->Draw("APL");
   return g;
 }
 
+
+//===================================
+// Plot pedestal
+//===================================
 TGraph* channel::plotPedestal(){
   TGraph *g=new TGraph(rlength,t,pedestals);
   g->Draw("APL");
@@ -169,7 +275,9 @@ TGraph* channel::plotPedestal(){
 }
 
 
-
+//===================================
+// Load pedestal
+//===================================
 void channel::loadPedestals(const char* pedestalfilename, int npedestals){
   for(int i=0;i<rlength;i++){pedestals[i]=0;}
   ifstream pedestalsfile;
@@ -209,12 +317,20 @@ void channel::loadPedestals(const char* pedestalfilename, int npedestals){
   for(int i=0;i<rlength;i++){pedestals[i]/=nwaves;}
 }
 
+
+//===================================
+// Subtract pedestal from raw data
+//===================================
 void channel::calibrate(){
   for(int i=0;i<rlength;i++)
     calibval[i]=rawval[i]-pedestals[i];
   calibrated=true;
 }
 
+
+//===================================
+// Returns integral signal starting from sigmin
+//===================================
 double channel::integral(int sigmin){
   if (!calibrated){
     cout<<"error: integral on non calibrated channel"<<endl;
@@ -225,26 +341,33 @@ double channel::integral(int sigmin){
   return sum;
 }
 
-double channel::integral2(int bkgmax){
+
+//===================================
+// Other method of integration
+//===================================
+double channel::integral2(int bkgmax, int sigmax) 
+{
   if (!calibrated){
     cout<<"error: integral on non calibrated channel"<<endl;
     return 0;
   }
-  double sumbkg=0,sumsig=0;
-  int bkgmin=0;
-  int sigmin=bkgmax, sigmax=800;//attention hardcoded numbers
-  for (int i=bkgmin;i<bkgmax;i++) sumbkg+=calibval[i];
-  for (int i=sigmin;i<sigmax;i++) sumsig+=calibval[i];
-  sumsig-=sumbkg*(sigmax-sigmin)/(bkgmax-bkgmin);
+  double sumbkg = 0, sumsig = 0;
+  int bkgmin = 0;
+  int sigmin = bkgmax;//attention hardcoded numbers
+  for (int i = bkgmin; i < bkgmax; i++) sumbkg += calibval[i];
+  for (int i = sigmin; i < sigmax; i++) sumsig += calibval[i];
+  sumsig -= sumbkg * (sigmax-sigmin) / (bkgmax-bkgmin);
   //this division is dangerous becuase the 
   //result depends on the integration window even if the signal is localized
   //completely inside the window
-  sumsig=sumsig/(sigmax-sigmin); 
-  return sumsig;
+  //sumsig = sumsig / (sigmax-sigmin);
 
+  return sumsig;
 }
 
 
+//===================================
+//===================================
 double channel::maxval(int bkgmax){
   if (!calibrated){
     cout<<"error: integral on non calibrated channel"<<endl;
@@ -260,6 +383,8 @@ double channel::maxval(int bkgmax){
 }
 
 
+//===================================
+//===================================
 double channel::smoothmax(int nchannels){
   if (!calibrated){
     cout<<"error: integral on non calibrated channel"<<endl;
@@ -279,6 +404,8 @@ double channel::smoothmax(int nchannels){
 }
 
 
+//===================================
+//===================================
 double channel::minval(int nchannels){
   if (!calibrated){
     cout<<"error: integral on non calibrated channel"<<endl;
@@ -296,14 +423,28 @@ double channel::minval(int nchannels){
   
 }
 
-TGraph* channel::fit(){
-  TGraph *g=new TGraph(rlength,t,calibval);
-  fitf->SetParameters(420,5,100,0,2e4,1);
-  fitf->FixParameter(5,1);//bw
-  g->Fit(fitf,"Q","",0,1024);
-  return g;  
+
+//===========================================
+// Fit wave with a user-defined function
+//===========================================
+bool channel::fit(TF1 *fun, int min, int max)
+{
+  //fitGraph.Set(rlength);
+  //for (int i = 0; i < rlength; i++) { 
+  //   fitGraph.SetPoint(i, t[i], calibval[i]);
+  //   fitGraph.SetPointError(i, 0.5, 15.0);
+  //}
+  
+  TGraphErrors fitGraph(rlength, t, calibval);
+  fitGraph.Fit(fun, "Q", "", min, max);
+  bool ok = (gMinuit->fCstatu == "CONVERGED ");
+  return ok;  
 }
 
+
+//===================================
+// Compute time 
+//===================================
 float channel::time(bool negative, int bkgmax, int sigmax ){
    if (!calibrated){
      cout<<"error: integral on non calibrated channel"<<endl;
@@ -311,14 +452,15 @@ float channel::time(bool negative, int bkgmax, int sigmax ){
    }
    int bkgmin=0;
    int sigmin=bkgmax;
-   //compute pedestal
+
+   // Compute mean value of the pedestal
    double pedestal=0;
    int sgn=negative?-1:+1;
    for (int i=bkgmin;i<bkgmax;i++) pedestal+=sgn*calibval[i];
    if (abs(bkgmax-bkgmin)>0) pedestal=pedestal/(bkgmax-bkgmin);
    //   cout<<"pedestal "<<pedestal<<endl;//debug
 
-   //find maximum
+   // Find maximum of the signal
    double max=-1e4;
    int nchannels=3;
    for (int i=sigmin;i<sigmax-nchannels;i++) {
@@ -349,8 +491,13 @@ float channel::time(bool negative, int bkgmax, int sigmax ){
    //cout<<"t0 "<<t0<<endl;//debug
    return t0;
  }
+//=============================================================================
+// End of channel class
+//=============================================================================
 
-enum algorithm{integral, integral2,maxval, smoothmax, minval, fit};
+
+// Define algorithms for pulse height computation
+enum algorithm{integral, integral2, maxval, smoothmax, minval};
 float getvalue(channel* ch, algorithm alg){
   float value=-999;
   switch (alg){
@@ -369,186 +516,303 @@ float getvalue(channel* ch, algorithm alg){
   case minval:
     value = ch->minval();
     break;
-  case fit:
-    ch->fit();
-    if (gMinuit->fCstatu == "CONVERGED ")
-      value=ch->fitted_ph()/100; //normalize to fit the histogram limits
-    else
-      value=0;
-    break;
+  //case fit: // obsolete...
+  //  ch->fit();
+  //  if (gMinuit->fCstatu == "CONVERGED ")
+  //    value=ch->fitted_ph()/100; //normalize to fit the histogram limits
+  //  else
+  //    value=0;
+  //  break;
   }
   return value;
 }
 
-TH1F* pulseheight(const char * fdata="data/wave.01_1.txt", 
-		  const char* fpedestals="pedestals/pedestal.01_1.txt", algorithm alg=integral2, int tmin=0, int tmax=1024, bool negative=false){
-  channel *ch=new channel(fdata,fpedestals);
-  TH1F *h = new TH1F("ph","pulse_height",2100,-52,2048);
-  TH1F *t= new TH1F("th","pulse_time",1024, 0,1023);
-  int ievent=0;
-  while (!(ch->eof())){
-    ch->loadNextEvent();
-    ievent++;
-    if (ievent%10000==0) cout<<"."<<flush;
-    float value=getvalue(ch,alg);
-    float time=alg!=fit? ch->time(negative) : ch->fitted_time() ;
-    if (gMinuit->fCstatu == "CONVERGED ")
-      t->Fill(time);{
-      if (tmin<time && time<tmax)
-	h->Fill(value,1);
+
+//=============================================================================
+// ChannelWithTrigger class
+//=============================================================================
+// - 20160112: Stefano 
+//   fitSignal: now it fits from 0-600 (instead up to rlength to better fit bipolar signal)           
+// - 20160115: Stefano 
+//   fitSignal: now tau_r range is [1, 30] and tau_f [30, 500] 
+class channelWithTrigger
+{
+public:
+  // Constructor and destructor 
+  channelWithTrigger(string fDataSig,
+                     string fDataTrg, 
+                     string fPedSig,
+                     string fPedTrg,
+                     int nPed = 0);
+  channelWithTrigger() {}
+  ~channelWithTrigger(); 
+  
+  // Read data and write tuple/histos in the outputfile
+  void read(int maxEvents = -1);
+
+  // Load next evnt for both channels
+  void loadNextEvent() { 
+    m_sigChannel.loadNextEvent();  
+    m_trgChannel.loadNextEvent(); 
+  }
+
+  // Returns signal channel
+  channel* sigChannel() { return &m_sigChannel; }
+
+  // Returns trigger channel
+  channel* trgChannel() { return &m_trgChannel; }
+
+  // Returns signal function
+  TF1* sigFun() { return m_sigFun; }
+  
+  // Returns trigger function
+  TF1* trgFun() { return m_trgFun; }
+  
+  // Fit signal
+  bool fitSignal(int min = 0, int max = 600);
+  //bool fitSignal(int min = 0, int max = channel::rlength);
+
+  // Fit trigger
+  //bool fitTrigger(int min = 100, int max = 200); // laser default
+  bool fitTrigger(int min = 100, int max = 300); //diode default
+
+  // Plot channels and go to next event
+  void plotNext(string ch = "signal");
+
+private:
+  channel m_trgChannel; // trigger ch.
+  channel m_sigChannel; // signal ch. 
+  TFile *m_outFile;     // output file
+  TTree *m_tree;        // output tree
+  TF1 *m_sigFun;
+  TF1 *m_trgFun;
+};
+
+//======================================================
+// Constructor
+//======================================================
+channelWithTrigger::channelWithTrigger(string fDataSig,
+                                       string fDataTrg, 
+                                       string fPedSig, 
+                                       string fPedTrg, 
+                                       int nPed)
+{
+  m_sigFun = new TF1("sigFun", sigwavef, 0, channel::rlength, 6);
+  m_trgFun = new TF1("trgFun", trgwavef_Gallo, 0, channel::rlength, 5);
+  //m_trgFun = new TF1("trgFun", trgwavef, 0, channel::rlength, 6);
+
+  m_sigChannel.setChannel(fDataSig.c_str(), fPedSig.c_str(), nPed);
+  m_trgChannel.setChannel(fDataTrg.c_str(), fPedTrg.c_str(), nPed);
+}
+
+//======================================================
+// Destructor
+//======================================================
+channelWithTrigger::~channelWithTrigger() {}
+
+//======================================================
+// Fit signal
+//======================================================
+bool channelWithTrigger::fitSignal(int min, int max) 
+{
+  m_sigFun->SetRange(min, max);
+  m_sigFun->SetParNames("t0", "tau_r", "tau_f", "ped", "norm", "bw");
+ 
+  m_sigFun->SetParLimits(0, 0, channel::rlength); //t0
+  m_sigFun->SetParLimits(1, 1., 30.); //tr
+  m_sigFun->SetParLimits(2, 30., 500.); //tf  
+ 
+  m_sigFun->FixParameter(5, 1); //bw
+
+  m_sigFun->SetParameters(150, 5, 100, 0, 2e4, 1); //(t0, tr, tf, ped, norm, bw)
+
+  return m_sigChannel.fit(m_sigFun, min, max);
+}
+
+//======================================================
+// Fit trigger
+//======================================================
+bool channelWithTrigger::fitTrigger(int min, int max) 
+{
+  m_trgFun->SetRange(min, max);
+  m_trgFun->SetNpx(1000);
+  
+  // New settings
+  m_trgFun->SetParNames("t0", "tau", "ped", "norm", "bw");
+  m_trgFun->SetParLimits(0, 50, 200); //t0
+  m_trgFun->SetParLimits(1, 0., 50.); //tau
+  m_trgFun->SetParLimits(2, -50, 50.); //ped
+  m_trgFun->SetParLimits(3, 1.3e3, 2.e3); //norm
+
+  m_trgFun->FixParameter(4, 1); //bw
+
+  m_trgFun->SetParameters(150, 1., 0., 1.4e3, 1); //(t0, tau, ped, norm, bw)
+
+  // Old settings
+  //m_trgFun->SetParNames("t0", "tau", "tstop", "ped", "norm", "bw");
+  //m_trgFun->SetParLimits(0, 0, channel::rlength); //t0
+  //m_trgFun->SetParLimits(1, 0., 50.); //tau
+  //m_trgFun->SetParLimits(2, 0., 1023.); //tstop
+ 
+  //m_trgFun->FixParameter(2, 1023); //tstop 
+  //m_trgFun->FixParameter(5, 1); //bw
+ 
+  //m_trgFun->SetParameters(100, 1, 1023, -20, 2e3, 1); //(t0, tau, tstop, ped, norm, bw)
+
+  return m_trgChannel.fit(m_trgFun, min, max);
+}
+
+//======================================================
+// Plot a channel and go to next event 
+//======================================================
+void channelWithTrigger::plotNext(string what)
+{
+  loadNextEvent(); 
+
+  // Plot trigger 
+  if (what == "trg" || what == "trigger" || what == "trig") {
+    if (!fitTrigger()) cout << ">>> TRIGGER NOT CONVERGED!" << endl;
+    m_trgFun->Print(); m_trgChannel.plot(); m_trgFun->Draw("PLx same"); 
+  }
+ 
+  // Plot signal
+  else if (what == "sig" || what == "signal") {
+    if (!fitSignal()) cout << ">>> SIGNAL NOT CONVERGED!" << endl;
+    m_sigFun->Print(); m_sigChannel.plot(); m_sigFun->Draw("PLx same");
+  }
+
+  // Plot both channels
+  else if (what == "both") {
+    if (!fitTrigger()) cout << ">>> TRIGGER NOT CONVERGED!" << endl;
+    if (!fitSignal()) cout << ">>> SIGNAL NOT CONVERGED!" << endl;
+    m_trgFun->Print(); m_sigFun->Print(); 
+
+    TGraph *t = m_trgChannel.plot(); TGraph *s = m_sigChannel.plot();
+    t->Draw("APL"); m_trgFun->Draw("PLx same"); 
+    s->SetLineColor(kBlue); m_sigFun->SetLineColor(kBlue); 
+    s->Draw("PLx same"); m_sigFun->Draw("PLx same");
+  }
+
+  else { cout << "PlotNext has not such an option!" << endl; }
+} 
+
+//======================================================
+// Read data and write histograms in the outputfile
+//======================================================
+void channelWithTrigger::read(int maxEvents)
+{
+  int nEvents = 0;
+  float sigTime = 0.0, trgTime = 0.0, pulseHeight = 0.0;
+  float integral = 0.0;
+  float tauRise = 0.0, tauFall = 0.0, chi2 = 0.0;
+  float tau = 0.0;
+
+  if (maxEvents == -1) 
+    maxEvents = 999999999;
+
+  // Output file and tree
+  m_outFile = new TFile("out.root", "recreate");
+  m_tree = new TTree("tree", ""); 
+
+  // Declare histograms
+  //TCanvas *canv = new TCanvas("canvas", "");
+  TH1F *hTrgTime = new TH1F("hTrgTime", "Trigger Time", 1024, 0, 1023);
+  TH1F *hSigTime = new TH1F("hSigTime", "Signal_Time", 1024, 0, 1023);
+  TH1F *hTimeDiff = new TH1F("hTimeDiff", "Time Difference", 200, -20., 100.);
+  TH1F *hPh = new TH1F("hPh", "Pulse Height", 850, -50., 800.);
+  TH1F *hChi2 = new TH1F("hChi2", "Fit chi2/nDoF", 200, 0.0, 200.0);
+  TH1F *hTauRise = new TH1F("hTauRise", "Fit tau(rise)", 200, 0.0, 100.0);
+  TH1F *hTauFall = new TH1F("hTauFall", "Fit tau(fall)", 200, 0.0, 500.0);
+  
+  // Declare branches 
+  m_tree->Branch("trgTime", &trgTime);
+  m_tree->Branch("sigTime", &sigTime);
+  m_tree->Branch("pulseHeight", &pulseHeight);
+  m_tree->Branch("integral", &integral);
+  m_tree->Branch("chi2", &chi2);
+  m_tree->Branch("tauRise", &tauRise);
+  m_tree->Branch("tauFall", &tauFall);
+  m_tree->Branch("tau", &tau);
+
+  
+  // Loop over events
+  while (!(m_trgChannel.eof()) && (nEvents < maxEvents)) {
+    // Load event
+    loadNextEvent();
+    nEvents++;
+    if (nEvents%10000 == 0) cout << "." << flush;
+
+    // Signal integral
+    integral = m_sigChannel.integral2(200, channel::rlength) / 100.; //(bkgmax, sigmax)
+
+    // Fit trigger
+    trgTime = tau = 9999999.;
+    if (fitTrigger()) {
+      trgTime = m_trgFun->GetParameter("t0"); 
+      tau = m_trgFun->GetParameter("tau");
+
+      // Debugging 
+      //m_trgChannel.plot();
+      //m_trgFun->Print();
+      //m_trgFun->Draw("PLx same");  
+      //canv->Update();
+      //canv->WaitPrimitive();
     }
+
+    // Fit signal
+    sigTime = pulseHeight = tauRise = tauFall = chi2 = 9999999.; 
+    if (fitSignal()) {
+      sigTime = m_sigFun->GetParameter("t0");
+      pulseHeight = m_sigFun->GetParameter("norm") / 100.;
+      chi2 = m_sigFun->GetChisquare() / float(m_sigFun->GetNDF());
+      tauRise = m_sigFun->GetParameter("tau_r");
+      tauFall = m_sigFun->GetParameter("tau_f");
+
+      // Debugging 
+      //float dt = sigTime - trgTime;
+      //bool cleancut = (tauRise > 2. && tauRise < 48.) && (tauFall > 55. && tauFall < 490.) && chi2 < 1.;
+      //bool tcut = (dt > 400. && dt < 450.);
+      //bool phcut = true; //pulseHeight < 50.;
+
+      //if (true) {
+      ////if (cleancut && tcut && phcut) {
+      //  cout << "> time: " << sigTime << ", ph: " << pulseHeight 
+      //       << ", dt: " << dt << ", chi2/nDoF: " << chi2 << endl;
+      //  m_sigChannel.plot();
+      //  m_sigFun->Print();
+      //  m_sigFun->Draw("PLx same");  
+      //  canv->Update();
+      //  canv->WaitPrimitive();
+      //}
+    }
+
+    // Fill histograms
+    hSigTime->Fill(sigTime);
+    hTrgTime->Fill(trgTime);
+    hTimeDiff->Fill(sigTime - trgTime);
+    hPh->Fill(pulseHeight);
+    hChi2->Fill(chi2);
+    hTauRise->Fill(tauRise);
+    hTauFall->Fill(tauFall);
+    m_tree->Fill();
   }
-  cout<<endl;
-  //  TCanvas *c1=new TCanvas("c1","c1",800,600);
-  //h->Draw();
-  t->Draw();
-  //  c1->Update();
-  return h;
-}
-
-
-
-
-void waveforms(){
-  TH1F* h=pulseheight("data24/2/950V tune 0%.txt","data24/2/pedestal 850V.txt");
-  TFile f("ph.root","update");
-  h->Write("ph");
-  f.Close();
-}
-
-
-TH1F** phsuperimposition(){
-  const int nh=64;
-  TH1F** harr=new TH1F*[nh];
-  for (int i=0; i<nh; i++){ 
-    char fn[256]; 
-    sprintf(fn,"/home/lhcb/rich-pd/pmttest/workdir/data/dataset2/px%.2d/950V/ph.root",i+1); 
-    //    cout<<fn<<endl; 
-    TFile *f=new TFile(fn); 
-    TCanvas* c1=(TCanvas*)f->FindObjectAny("c1");
-    if (i==0) c1->Draw();
-    TH1F* h=(TH1F*)c1->FindObject("ph"); 
-    harr[i]=(TH1F*)h->Clone();
-  }
-  TCanvas *c=new TCanvas("canv","canv",800,600);
-  c->Draw();
-  for (int i=0;i<nh;i++){
-    const int ngroup=5;
-    harr[i]->Rebin(ngroup);
-    //    harr[i]->Smooth();
-    harr[i]->SetMaximum(200*ngroup);
-    harr[i]->SetLineColor(i);
-    harr[i]->GetXaxis()->SetRange(int(10./ngroup),int(250./ngroup));
-    harr[i]->SetStats(kFALSE);
-    if (harr[i]->GetMean() > 5) harr[i]->Draw(i==0?"l":"l same");
-    else cout<<"excluded pix "<<i+1<<endl;
-  }
-  return harr;
-
-}
-
-#include "TF1.h"
-#include "TCanvas.h"
-#include "TROOT.h"
-#include "TStyle.h"
-void stage(){
-  TCanvas *c=new TCanvas("c","c",800,600);
-
-  channel ch("data/scint-coincid123-ph4-th60mV.dat","data/scint-pedestal.dat");
-  ch.plot(25);
-  //c->SaveAs("stage_pulse_shape.eps");
-  //c->SaveAs("stage_pulse_shape.png");
-
-  c->SetLogy(1);
-
-  TH1F* h = pulseheight("data/scint-coincid123-ph4-th60mV.dat","data/scint-pedestal.dat",minval, 165,300);
-  TH1F* th=(TH1F*)gROOT->FindObjectAny("th");
-  th->GetXaxis()->SetTitle("time (1 unit = 0.2 ns)");
-  //if (th!=nullptr){
-    th->Fit("gaus","","",100,400);
-    th->Draw("e");
-    //c->SaveAs("stage_pulse_time.eps");
-    //c->SaveAs("stage_pulse_time.png");
-    //}
   
-  h->GetXaxis()->SetTitle("pulse height (1 unit = 0.24 mV)");
-  h->Rebin(42);
-  float bw=h->GetBinWidth(0);
-  TF1 * f=new TF1("f","[0]*[7]*([3]*TMath::Gaus(x,[1],[2],1) + [5]*exp(-x/[4])/[4]+(1-[3]-[5])*exp(-x/[6])/[6] )",0,2000);
-  f->SetParNames("norm","mu","sigma","frac","alpha1","frac1","alpha2","bw");
-  f->SetParameters(h->GetEntries(),500,300,0.75,50,0.2,1000,bw);
-  f->SetParLimits(0,0,1e5);
-  f->SetParLimits(1,0,1024);
-  f->SetParLimits(2,0,1024);
-  f->SetParLimits(3,0,1);
-  f->SetParLimits(4,0,100);
-  f->SetParLimits(5,0,1);
-  f->SetParLimits(6,100,1e4);
-  f->FixParameter(7,bw);
+  cout << endl;
 
-  gStyle->SetOptFit(1);
-  c->SetLogy(0);
-  h->Fit(f,"l","",0,1500);
-  h->Draw("e");
-  //c->SaveAs("stage_pulse_height.eps");
-  //c->SaveAs("stage_pulse_height.png");
+  // Write histograms
+  hTrgTime->Write();
+  hSigTime->Write();
+  hTimeDiff->Write();
+  hPh->Write();
+  hChi2->Write();
+  hTauRise->Write();
+  hTauFall->Write();
 
+  m_tree->Write();
+  m_outFile->Close();
 }
+//=============================================================================
+// End of channelWithTrigger class
+//=============================================================================
 
-// my version 
 
-void stageLeo(){
-  TCanvas *c=new TCanvas("c","c",800,600);
-  //channel ch("data/scint4-3-custom-2907-10000-2.dat","data/scint4-3-custom-2907-10000-pedestal-2.dat");
-  channel ch("data/scint4-3-custom-3007-100000-2.dat","data/scint4-3-custom-3007-100000-pedestal-1.dat");
-  ch.plot(5);
-  //c->SaveAs("data/stage_pulse_shape_leo.eps");
-  //c->SaveAs("data/stage_pulse_shape_leo.png");
-
-  //c->SetLogy(1);
-  
-  //TH1F* h = pulseheight("data/scint4-3-custom-2907-10000-2.dat","data/scint4-3-custom-2907-10000-pedestal-2.dat",minval,165,300);
-  TH1F* h = pulseheight("data/scint4-3-custom-3007-100000-2.dat","data/scint4-3-custom-3007-100000-pedestal-1.dat",minval,165,300);
-  TH1F* th=(TH1F*)gROOT->FindObjectAny("th");
-  th->GetXaxis()->SetTitle("time (1 unit = 0.2 ns)");
- //  TF1 * g = new TF1("g","log([0]*[1]/[2])-([3]+x*[1])/[2]",0,1000);
-//   g->SetParNames("N0","delta_t_bin","mu_tau","t0");
-//   g->SetParameters(th->GetEntries(),1,11,0);
-//   g->SetParLimits(0,0,1e05);
-//   g->SetParLimits(1,0.5,1.5);
-//   g->SetParLimits(2,5,15);
-//   g->SetParLimits(3,0,1e-05);
-// gStyle->SetOptFit(1);
-//   c->SetLogy(0);
-
-  //if (th!=nullptr){
-  th->Fit("gaus","","",100,400);
-  //th->Fit(g,"l","",0,1000);
-  th->Draw("e");
-    //c->SaveAs("data/stage_pulse_time_leo.eps");
-    //c->SaveAs("data/stage_pulse_time_leo.png");
-    //}
-      
-  h->GetXaxis()->SetTitle("pulse height (1 unit = 0.24 mV)");
-  h->Rebin(42);
-  float bw=h->GetBinWidth(0);
-  TF1 * f=new TF1("f","[0]*[7]*([3]*TMath::Gaus(x,[1],[2],1) + [5]*exp(-x/[4])/[4]+(1-[3]-[5])*exp(-x/[6])/[6] )",0,2000);
-  f->SetParNames("norm","mu","sigma","frac","alpha1","frac1","alpha2","bw");
-  f->SetParameters(h->GetEntries(),400,200,0.8,50,0.15,1000,bw);
-  f->SetParLimits(0,0,1e5);
-  f->SetParLimits(1,0,1024);
-  f->SetParLimits(2,0,1024);
-  f->SetParLimits(3,0,1);
-  f->SetParLimits(4,0,100);
-  f->SetParLimits(5,0,1);
-  f->SetParLimits(6,100,1e4);
-  f->FixParameter(7,bw);
-
-  gStyle->SetOptFit(1);
-  c->SetLogy(0);
-  h->Fit(f,"l","",0,1500);
-  h->Draw("e");
-  //c->SaveAs("data/stage_pulse_height_leo.eps");
-  //c->SaveAs("data/stage_pulse_height_leo.png");
-  
-}
