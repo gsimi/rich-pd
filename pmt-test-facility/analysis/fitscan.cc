@@ -250,6 +250,15 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->FixParameter(10,bw);//bw
     break;
 
+  case 8:
+    npar=8;  
+    f=new TF1("spectrfit",silviapdf,xmin,xmax,npar);
+    f->SetParNames( "npe", "gain", "cs",        "ped",   "cb",    "norm", "f1", "bw");
+    f->SetParameters(npe,   gain, 1./gainSpread ,offset, 1./inoise,norm , 0.05, bw);
+    f->SetParLimits(2,1./gain,2/bw);
+    f->SetParLimits(6,0,0.25);//f1    
+    f->FixParameter(7,bw);//bw
+    break;
 
   }
 
@@ -293,13 +302,12 @@ fitscan(TH1F* h, double fmin=0, double fmax=1, double HV=950, bool forcesignal=f
     f->ReleaseParameter(10);
     f->SetParLimits(9,0,1);//w
     f->SetParLimits(10,0.1/gain,1./inoise);//alpha
-  }else{
+  }else if (fitmodel!=8) {
     f->SetLineColor(kBlue);
     f->ReleaseParameter(6);
     f->SetParLimits(6,0.3*gain1,4*gain1);//gain1
   }
   h->Fit(f,"EML","",xmin,xmax);
-  
 
 
   cout<<"done"<<endl;
@@ -488,7 +496,7 @@ double** mfitscan(const char * listfilename="filelist.txt", const char* fitted_d
   double** parmatrix = new double*[nfiles];
   for (int ifile=0;ifile<nfiles; ifile++){
     cout<<"\n"<<"file directory : "<<flist[ifile].c_str()<<endl;
-    TF1* f=fitscan((char*)flist[ifile].c_str(),5./100,1, forcesignal, fitmodel);
+    TF1* f=fitscan((char*)flist[ifile].c_str(),0,1, forcesignal, fitmodel);
     if (f==0){ cout<<"Error, fit for "<<flist[ifile].c_str()<<
 	" not found, skipping"<<endl;
       continue;}
