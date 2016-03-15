@@ -32,6 +32,9 @@
 #include "RooFormulaVar.h"
 #include "RooFitResult.h"
 #include "RooCustomizer.h"
+#include "mypdfs/myRooGamma.h"
+#include "mypdfs/MyExp.h"
+#include "mypdfs/myRooPoisson.h"
 using namespace RooFit ;
 
 /* TODO: io farei una bella classe... poi fai te!
@@ -43,6 +46,7 @@ using namespace RooFit ;
 
 // Fwd declaration
 void dofit( TString, TString, Int_t );
+RooFitResult* getFit(TString, TString);
 void loadHamamatsuGain( TString serialNo );
 void loadChannelMap( );
 
@@ -162,10 +166,6 @@ void dofit( TString dataFile,
   TH1F *hh;
   Int_t dump_pdf_output = 1;
   Int_t nEvents = 0;
-  Double_t roofit_x_min = 0., roofit_x_max = 0.;
-  Double_t lowe = 0., cent = 0., uppe = 0.;
-  RooArgList *pdfs = new RooArgList;
-  RooArgList *coeffs = new RooArgList;
   
 
   //===================================
@@ -173,7 +173,6 @@ void dofit( TString dataFile,
   //===================================
   // Padova data 
   if (lab == "Padova") {
-    roofit_x_min = -50.; roofit_x_max = 1050.;
 
     TChain ch("tree");
     ch.Add( dataFile );
@@ -191,7 +190,6 @@ void dofit( TString dataFile,
 
   // MAROC data
   else if (lab == "MAROC") {
-    roofit_x_min = -50.; roofit_x_max = 1050.;
 
     TChain ch("mdfTree");
     ch.Add(dataFile);
@@ -254,7 +252,6 @@ void dofit( TString dataFile,
     // dataFile="../SpectraFitting_Edinburgh/inputs/gainMap/FA0002_bl.root"; // high gain ?
     // dataFile="../SpectraFitting_Edinburgh/inputs/gainMap/ZN0971_bl.root"; // low gain
     //dataFile="../SpectraFitting_Edinburgh/inputs/gainMap/FA0006_bl.root"; // low gain
-    roofit_x_min = 0.; roofit_x_max = 1000.;
 
     TChain ch("QDCReadoutTree");
     ch.Add(dataFile);
@@ -283,6 +280,25 @@ void dofit( TString dataFile,
   cout << "Analyzing data file: " << dataFile << "..." << endl;
   cout << "Number of events: " << nEvents << endl;
 
+  RooFitResult* result =  getFit(hh,lab);
+}
+  
+RooFitResult* getFit( TH1F *hh,
+                     TString lab = "Padova")
+{
+
+  Int_t dump_pdf_output = 1;
+  Double_t lowe = 0.0;  Double_t cent = 0.0; Double_t uppe = 0.0;
+  Double_t roofit_x_min = 0.;
+  Double_t roofit_x_max = 0.;
+  if (lab == "Padova"){
+    roofit_x_min = -50.; roofit_x_max = 1050.;
+  }   else if (lab == "MAROC") {
+    roofit_x_min = -50.; roofit_x_max = 1050.;
+  }  else if (lab == "Edinburgh") {
+    roofit_x_min = 0.; roofit_x_max = 1000.;
+  }
+
   hh->SetMinimum(1.);
   Double_t hh_y_max = hh->GetMaximum(); // cout << hh_y_max << endl;
   Double_t hh_x_max = hh->GetXaxis()->GetXmax(); // cout << hh_x_max << endl;
@@ -295,7 +311,7 @@ void dofit( TString dataFile,
   TSpectrum *s = new TSpectrum(4);
   Int_t npeaks = s->Search(hh,4," ",5e-4); // used to configure the Search 
   cout << "Found " << npeaks << " candidate peaks !" << endl;
-  Double_t *xpeaks = s->GetPositionX();
+  Float_t *xpeaks = s->GetPositionX();
   for (Int_t p=0;p<npeaks;p++) {
     x_peaks[p] = static_cast<Double_t>(xpeaks[p]);
     Int_t bin = hh->GetXaxis()->FindBin(x_peaks[p]);
@@ -306,9 +322,11 @@ void dofit( TString dataFile,
     cout << "uninitialized peak:" << endl;
     cout << x_peaks[1] << endl; 
   }
+
   //***valley with TSpectrum***
   TH1F *hhswap = (TH1F*)hh->Clone();
-  /* Double_t BinContent=0.;
+
+     Double_t BinContent=0.;
   for(Int_t n_bins=0;n_bins<hh->GetNbinsX();n_bins++){
 
     if( hh->GetBinCenter(n_bins+1)<x_peaks[0] ){
@@ -329,7 +347,9 @@ void dofit( TString dataFile,
     Int_t bin = hhswap->GetXaxis()->FindBin(x_swap[ps]);
     Double_t yp = hhswap->GetBinContent(bin);
     cout << bin << " " << x_swap[ps] << " " << yp << endl;
-  } */
+  }
+  
+  
 
   TCanvas *cInput = new TCanvas("cInput","Pattern reco.",600,600); cInput->Divide(1,2);
   cInput->cd(1); hh->Draw();
@@ -363,33 +383,50 @@ void dofit( TString dataFile,
   cent = x_peaks[1]; lowe = 0.5*cent; uppe = 1.5*cent;
   RooRealVar mean_1pe("mean_1pe", "mean of 1pe signal gaussian", cent, lowe, uppe);
   RooRealVar sigma_1pe("sigma_1pe", "width of 1pe signal gaussian", 10., 5.0, 20.0); // MAROC
-  //RooRealVar sigma_1pe("sigma_1pe", "width of 1pe signal gaussian", cent/sqrt(6.), 20.0, 120.0); // Padova
+  //  RooFormulaVar sigma_1pe("sigma_1pe", "mean_1pe*0.527", mean_1pe); //0.527=sqrt(g/g1/(g-1)*(1-1./g+1./g2)) fix its value from pmtsim.C a
 
   // mean and error of 1 p.e. component for cross talk
-  RooRealVar mean_1pe_ct("mean_1pe_ct", "mean of 1pe cross-talk gaussian", 2., 0.0, 10.0); // MAROC
-  RooRealVar sigma_1pe_ct("sigma_1pe_ct", "width of 1pe cross-talk gaussian", 0.01, 0.0, 10.); // fit prefers small values...
-  //RooRealVar mean_1pe_ct("mean_1pe_ct", "mean of 1pe cross-talk gaussian", 20.0, 0.0, 50.0); // Padova
-  //RooRealVar sigma_1pe_ct("sigma_1pe_ct", "width of 1pe cross-talk gaussian", 10.0, 2.0, 120.0);
-  //RooFormulaVar sigma_1pe_ct("sigma_1pe_ct", "mean_1pe_ct*0.52", mean_1pe_ct); //0.52 fix its value from pmtsim.C 
-
+  RooRealVar mean_1pe_ct("mean_1pe_ct", "mean of 1pe cross-talk gaussian", 5., 0.0, 10.0); // MAROC
+  //RooRealVar sigma_1pe_ct("sigma_1pe_ct", "width of 1pe cross-talk gaussian", 1, 0.0, 10.); // fit prefers small values...
+  RooFormulaVar sigma_1pe_ct("sigma_1pe_ct", "mean_1pe_ct*0.4", mean_1pe_ct); //0.527=sqrt(g/g1/(g-1)*(1-1./g+1./g2)) fix its value from pmtsim.C and also from theorethical calculation using gain = 1e6 
   // mean number of neighbouring pixels
   // RooRealVar npx("npx", "mean number of neighbouring pixels", 1.0, 1e-3, 10.0); 
   // mean number of cross talk signals per pixels
   RooRealVar npe_ct("npe_ct", "mean number of xtalk signals per pixels", 0.1, 1e-3, 10.0); 
 
-  // Fraction of the extra component for MAROC spectra
-  RooRealVar *frac_extra = new RooRealVar("frac_extra", "Fraction of the extra gaussian", 0.); // fixed to zero 
-  if (lab == "MAROC") 
-    frac_extra = new RooRealVar("frac_extra", "Fraction of the extra gaussian", 0., 0., 1.); // floating
 
+  // Fraction of the extra component for MAROC spectra
+  RooRealVar *frac_extra = new RooRealVar("frac_extra", "Fraction of the extra gaussian/tot", 0.0); // fixed
+  
+  if (lab == "MAROC") {
+    frac_extra->setVal(0.1);
+    frac_extra->setRange(0.,1.);
+    frac_extra->setConstant(false);
+  }
+  //fraciton of events in the tail of the gaus function
+  RooRealVar *frac_tail = new RooRealVar("frac_tail", "Fraction of tails of gaussian", 0.0,0.0,1.0); 
+  RooRealVar *sigma_tail = new RooRealVar("sigma_tail","sigma of the tail gaussian for signal model",60,5,200);
+
+  //==============
+  // CONFIGURATION
+  //==============
+  bool useextragamma=false;
+  bool usetail=false;
+  bool multistagefit=false;
+  enum imodel {gaussmodel, poissonmodel};
+  int signal_model=gaussmodel;
 
   //==================
-  // Build gaussians
+  // Build pdfs
   //==================
   const int NGauss = 5;
   const int NGaussct = 3;
+  RooArgList *pdfs = new RooArgList;
+  RooArgList *coeffs = new RooArgList;
   TString name, expr, title;
 
+  switch(signal_model){
+  case gaussmodel:
   for (int ns = 0; ns < NGauss + 1 ; ns++) {
     for (int nct = 0; nct < NGaussct + 1; nct++) {
       name.Form("mean_G%i_%i", ns, nct); // mean
@@ -399,38 +436,65 @@ void dofit( TString dataFile,
       name.Form("sigma_G%i_%i", ns, nct); // sigma
       expr.Form("sqrt(sigma_n*sigma_n + %i*sigma_1pe*sigma_1pe + %i*sigma_1pe_ct*sigma_1pe_ct)", ns, nct);
       RooFormulaVar *sigma = new RooFormulaVar(name, expr, RooArgList(sigma_n, sigma_1pe, sigma_1pe_ct));
+      
 
-      name.Form("G%i_%i", ns, nct); // gaussian
-      TString title; title.Form("Gaussian component %i-%i", ns, nct);
-      RooGaussian *gaussian = new RooGaussian(name, title, x, *mean, *sigma); 
-    
-      name.Form("N_G%i_%i", ns, nct); // coefficient
-      expr.Form("(1-frac_extra)*TMath::Poisson(%i, npe)*TMath::Poisson(%i, npe_ct)", ns, nct);
-      RooFormulaVar *coeff = new RooFormulaVar(name, expr, RooArgList( *frac_extra, npe, npe_ct));
+	name.Form("G%i_%i", ns, nct); // gaussian
+	TString title; title.Form("Gaussian component %i-%i", ns, nct);
+	RooAbsPdf *gauss = new RooGaussian(name, title, x, *mean, *sigma); 
 
-      pdfs->add( *gaussian );
-      coeffs->add( *coeff );
+	name.Form("T%i_%i", ns, nct); // tail gaussian
+	TString title; title.Form("Gaussian tail component %i-%i", ns, nct);
+	RooAbsPdf *tail = new RooGaussian(name, title, x, *mean, *sigma_tail); 
+      
+	name.Form("S%i_%i", ns, nct); // gauss + tail
+	TString title; title.Form("signal component %i-%i", ns, nct);
+	RooAbsPdf *signal;
+	if (usetail)
+	  signal=new RooAddPdf(name,title,RooArgList(*gauss,*tail),RooArgList(*frac_tail));
+	else{
+	  signal=gauss;
+	  signal->SetName(name);
+	  signal->SetTitle(title);
+	}
+
+	name.Form("N_G%i_%i", ns, nct); // coefficient
+	expr.Form("TMath::Poisson(%i, npe)*TMath::Poisson(%i, npe_ct)", ns, nct);
+	RooFormulaVar *coeff = new RooFormulaVar(name, expr, RooArgList( npe, npe_ct));
+      
+	pdfs->add( *signal );
+	coeffs->add( *coeff );
+      }
     }
+    break;
+  case poissonmodel:
+    
+    for (int ns = 0; ns < NGauss + 1 ; ns++) {
+      for (int nct = 0; nct < NGaussct + 1; nct++) {
+	RooRealVar *g1  = new RooRealVar("g1", "mg1",  6,   1., 10.);
+
+	name.Form("sigma_G%i_%i", ns, nct); // sigma
+	expr.Form("sqrt(sigma_n*sigma_n + %i*sigma_1pe*sigma_1pe + %i*sigma_1pe_ct*sigma_1pe_ct )", ns, nct);
+	RooFormulaVar *sigma = new RooFormulaVar(name, expr, RooArgList(sigma_n, sigma_1pe, sigma_1pe_ct));
+
+	name.Form("S%i_%i", ns, nct); // poisson
+	TString title; title.Form("Poisson component %i-%i", ns, nct);
+	myRooPoisson *signal = new myRooPoisson(name,title,x,mean_n,*sigma,*g1,true);
+
+	name.Form("N_G%i_%i", ns, nct); // coefficient
+	expr.Form("TMath::Poisson(%i, npe)*TMath::Poisson(%i, npe_ct)", ns, nct);
+	RooFormulaVar *coeff = new RooFormulaVar(name, expr, RooArgList( npe, npe_ct));
+
+	pdfs->add( *signal );
+	coeffs->add( *coeff );
+      }
+    }
+    
+    break;
   }
+  if (useextragamma){
+    // Add an extra GAMMA to fit MAROC data
+    if (lab == "MAROC") {
 
-  // Add an extra gaussian to fit MAROC data
-  RooAbsPdf *extra;
-
-  RooRealVar *gammapar;
-  RooRealVar *betapar;
-
-  //RooRealVar *sl, *thr;
-  //RooFormulaVar *dxped;
-  //RooStats::Heaviside theta("theta","theta func",x,mean_n);
-  //
-  //RooGenericPdf *stepFun; 
-  //RooRealVar *leftEdge, *width;
-  //RooFormulaVar *rightEdge;
-
-  //RooGaussian *cgauss;
-  //RooRealVar *csigma;
-
-  if (lab == "MAROC") {
     //cent = 0.5*(x_peaks[0] + x_peaks[1]); lowe = 0.5*cent; uppe = 1.1*cent;  // better using pos. last ct gaussian
 
   //RooFormulaVar *mean = new RooFormulaVar("mean_Gextra", "mean_n + 3*mean_1pe_ct + mean_extra", RooArgList(mean_n, mean_1pe_ct, *mean_extra));
@@ -469,9 +533,15 @@ void dofit( TString dataFile,
 
   //  pdfs->add ( *extra );
   //  coeffs->add( *frac_extra );
+      RooRealVar *gammapar = new RooRealVar("gamma","gamma", 1.25, 1., 100.);
+      RooRealVar *betapar  = new RooRealVar("beta", "beta",  40,   0., 100.);
+      myRooGamma* extra = new myRooGamma("extra", "gammapdf", x, *gammapar, *betapar, mean_n);
+      
+      pdfs->add ( *extra );
+      //      coeffs->add(*frac_extra);
+    }
   }
-  
-  // build model
+  // build signal model as sum of pdfs
   RooAddPdf model("model", "Model for signal + cross-talk + noise", *pdfs, *coeffs);
 
 
@@ -480,8 +550,15 @@ void dofit( TString dataFile,
   //========
   RooPlot* frame = x.frame( Title(" ") );
   dh.plotOn( frame );
-  model.fitTo( dh );
-
+  // x.setRange("R1",0,22);
+  // model.fitTo(dh,Range("R1,R2")) ;
+  model.fitTo(dh) ;
+  if (multistagefit){
+    sigma_n->setConstant(true);
+    mean_n->setConstant(true);
+    x.setRange("R2",30,200);
+    model.fitTo(dh,Range("R2")) ;
+  }
 
   //==================
   // Plot components
@@ -489,7 +566,7 @@ void dofit( TString dataFile,
   model.plotOn(frame, "", LineColor(2)); 
   for (int ns = 0; ns < NGauss + 1; ns++) {
     for (int nct = 0; nct < NGaussct + 1; nct++) {
-      name.Form("G%i_%i", ns , nct ); 
+      name.Form("S%i_%i", ns , nct ); 
       model.plotOn(frame, Components(name), LineColor(ns == 0 ? 1 : ns + 3), LineStyle(nct + 1));
     }   
   }
@@ -554,6 +631,8 @@ void dofit( TString dataFile,
 
   m_sigma_1pe_ct[pxID -1] = sigma_1pe_ct.getVal();
   m_dsigma_1pe_ct[pxID -1] = sigma_1pe_ct.getError();
+
+  return fitres;
 }
 
 
