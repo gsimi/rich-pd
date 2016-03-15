@@ -92,11 +92,14 @@ ENABLED_FAST_TRIGGER_DIGITIZING		YES
 # POST_TRIGGER: post trigger size in percent of the whole acquisition window
 # options: 0 to 100
 # On models 742 there is a delay of about 35nsec on signal Fast Trigger TR; the post trigger is added to this delay  
-## for laser use 150ns delay
-#with 1024 samples
+## for laser use 150ns delay with 1024 samples
+
 # use this for laser
 #POST_TRIGGER  70
+
+# Stefano
 POST_TRIGGER  60
+
 #with 512 samples
 #POST_TRIGGER  55
 
@@ -104,8 +107,7 @@ POST_TRIGGER  60
 
 # TRIGGER_EDGE: decides whether the trigger occurs on the rising or falling edge of the signal
 # options: RISING, FALLING
-TRIGGER_EDGE  FALLING
-#TRIGGER_EDGE  RISING
+TRIGGER_EDGE  RISING
 
 # USE_INTERRUPT: number of events that must be ready for the readout when the IRQ is asserted.
 # Zero means that the interrupts are not used (readout runs continuously)
@@ -178,9 +180,9 @@ GRP_CH_DC_OFFSET       0,0,0,0,0,0,0,0
 TRIGGER_THRESHOLD      0
 CHANNEL_TRIGGER        ACQUISITION_ONLY
 GROUP_TRG_ENABLE_MASK  01 
-# bug fixed in CAEN code, GroupWriteMask chanded from 8bit int to 1bit int to include trigger bit 0x100
+# bug fixed in CAEN code, GroupWriteMask chanded from 8bit int to 16bit int to include trigger bit 0x100
 # customized bit 0x200 forces the sysem to write the trigger and the channel data into the same stream
-GROUP_WRITE_MASK       0x202
+GROUP_WRITE_MASK       0x102
 
 [1]
 ENABLE_INPUT           NO
@@ -268,13 +270,20 @@ GROUP_TRG_ENABLE_MASK  00
 [TR0]
 #DC_OFFSET              31768	
 # 0V
-DC_OFFSET              32767	
+
+# use this for TTL 
+DC_OFFSET              32768	
+TRIGGER_THRESHOLD      49152
+
+# use this for NIM 
+#DC_OFFSET              32768	
+#TRIGGER_THRESHOLD      20934
+
 # use this for laser
 #TRIGGER_THRESHOLD      31750	
-#
+
 #TRIGGER_THRESHOLD      22000
 #0.5V with offset at 0V
-TRIGGER_THRESHOLD      49152
 #1.2V
 #TRIGGER_THRESHOLD      39321
 
