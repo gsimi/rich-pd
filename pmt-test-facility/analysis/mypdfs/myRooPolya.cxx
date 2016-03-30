@@ -23,6 +23,7 @@
 #include "RooMath.h"
 #include "TMath.h"
 #include "Math/ProbFuncMathCore.h"
+#include "Math/PdfFuncMathCore.h"
 
 using namespace std;
 
@@ -141,7 +142,8 @@ void myRooPolya::generateEvent(Int_t code)
   assert(code==1) ;
   Double_t xgen ;
   while(1) {    
-    xgen = RooRandom::randomGenerator()->Polya(mean);
+    //xgen = RooRandom::randomGenerator()->Polya(mean);
+    xgen=0; cout<<"generator not implemented"<<endl;
     if (xgen<=x.max() && xgen>=x.min()) {
       x = xgen ;
       break;

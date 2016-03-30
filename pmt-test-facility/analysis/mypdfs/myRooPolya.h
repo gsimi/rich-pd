@@ -17,7 +17,7 @@
  
 class myRooPolya : public RooAbsPdf {
 public:
-  myRooPolya() { _noRounding = kFALSE ; } ;
+  myRooPolya() { } ;
   myRooPolya(const char *name, const char *title, RooAbsReal& _x, RooAbsReal& _x0, RooAbsReal& _mean, RooAbsReal& _b);
   myRooPolya(const myRooPolya& other, const char* name=0) ;
   virtual TObject* clone(const char* newname) const { return new myRooPolya(*this,newname); }

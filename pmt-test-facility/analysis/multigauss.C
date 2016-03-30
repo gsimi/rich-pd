@@ -35,6 +35,7 @@
 #include "mypdfs/myRooGamma.h"
 #include "mypdfs/MyExp.h"
 #include "mypdfs/myRooPoisson.h"
+#include "mypdfs/myRooPolya.h"
 #include "TROOT.h"
 using namespace RooFit ;
 
