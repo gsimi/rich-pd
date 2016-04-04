@@ -77,6 +77,7 @@ Float_t m_mean_1pe_ct[NPX] = {0.}, m_dmean_1pe_ct[NPX] = {0.};
 Float_t m_sigma_1pe_ct[NPX] = {0.}, m_dsigma_1pe_ct[NPX] = {0.};   
 
 
+
 //======================================================
 // Multigauss main routine
 //======================================================
@@ -99,6 +100,8 @@ void multigauss( TString dataFile,
      gROOT->ProcessLine(".L mypdfs/myRooGamma.cxx+");
      gROOT->ProcessLine(".L mypdfs/myRooPoisson.cxx+");
      gROOT->ProcessLine(".L mypdfs/myRooPolya.cxx+");
+     gROOT->ProcessLine(".L mypdfs/MyExp.cxx+"); 
+
   */
 
 
@@ -350,7 +353,7 @@ RooFitResult* getFit( TH1F *hh,
   }
   Double_t x_swap[2]={20.,1000.}; // initial values
   TSpectrum *swap = new TSpectrum(2);
-  npeaks = swap->Search(hhswap,2," ",1e-6); // used to configure the Search
+  npeaks = swap->Search(hhswap, 10, "nobackground", 1e-1); // used to configure the Search
   cout << "Found " << npeaks << " <<swapped>> candidate peaks !" << endl;
   Double_t *xswap = swap->GetPositionX();
   for (Int_t ps=0;ps<2;ps++) {
@@ -410,8 +413,8 @@ RooFitResult* getFit( TH1F *hh,
   RooRealVar *frac_extra = new RooRealVar("frac_extra", "Fraction of the extra gaussian/tot", 0.0); // fixed
   
   if (lab == "MAROC") {
-    frac_extra->setVal(0.1);
-    frac_extra->setRange(0.,1.);
+    frac_extra->setVal(0.05);
+    frac_extra->setRange(0.,.15);
     frac_extra->setConstant(false);
   }
   //fraciton of events in the tail of the gaus function
@@ -421,7 +424,7 @@ RooFitResult* getFit( TH1F *hh,
   //==============
   // CONFIGURATION
   //==============
-  bool useextragamma=false;
+  bool useextragamma=true;
   bool usetail=false;
   bool multistagefit=false;
   enum imodel {gaussmodel, poissonmodel};
@@ -469,8 +472,8 @@ RooFitResult* getFit( TH1F *hh,
 	}
 
 	name.Form("N_G%i_%i", ns, nct); // coefficient
-	expr.Form("TMath::Poisson(%i, npe)*TMath::Poisson(%i, npe_ct)", ns, nct);
-	RooFormulaVar *coeff = new RooFormulaVar(name, expr, RooArgList( npe, npe_ct));
+	expr.Form("(1-frac_extra)*TMath::Poisson(%i, npe)*TMath::Poisson(%i, npe_ct)", ns, nct);
+	RooFormulaVar *coeff = new RooFormulaVar(name, expr, RooArgList( *frac_extra, npe, npe_ct));
       
 	pdfs->add( *signal );
 	coeffs->add( *coeff );
@@ -544,12 +547,12 @@ RooFitResult* getFit( TH1F *hh,
 
   //  pdfs->add ( *extra );
   //  coeffs->add( *frac_extra );
-      RooRealVar *gammapar = new RooRealVar("gamma","gamma", 1.25, 1., 100.);
-      RooRealVar *betapar  = new RooRealVar("beta", "beta",  40,   0., 100.);
+      RooRealVar *gammapar = new RooRealVar("gamma","gamma", 4.6, 0.5, 5.);
+      RooRealVar *betapar  = new RooRealVar("beta", "beta",  2.3,   2., 20.);
       myRooGamma* extra = new myRooGamma("extra", "gammapdf", x, *gammapar, *betapar, mean_n);
       
       pdfs->add ( *extra );
-      //      coeffs->add(*frac_extra);
+      coeffs->add(*frac_extra);
     }
   }
   // build signal model as sum of pdfs
