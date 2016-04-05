@@ -42,7 +42,7 @@ myRooPolya::myRooPolya(const char *name, const char *title,
   x0("x0","x0",this,_x0),
   mean("mean","mean",this,_mean),
   b("b","b",this,_b),
-  _protectNegative(false)
+  _protectNegative(true)
 { 
   // Constructor  
 } 
@@ -69,9 +69,11 @@ Double_t myRooPolya::evaluate() const
 { 
   // Implementation in terms of the TMath Polya function
 
-  if(_protectNegative && mean<0) 
-    return 1e-3;
-  return ROOT::Math::negative_binomial_pdf(x-x0,1/(1+mean*b),b) ;
+  if(_protectNegative && mean<0 ) 
+    return 1e-6;
+  if(_protectNegative && x-x0<0 ) 
+    return 0;
+  return ROOT::Math::negative_binomial_pdf(x-x0,1/(1+mean*b),1./b) ;
 } 
 
 
