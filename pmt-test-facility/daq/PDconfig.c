@@ -398,6 +398,11 @@ int ParseConfigFile(FILE *f_ini, WaveDumpConfig_t *WDcfg)
 	  continue;
 	}
 
+
+	if (strstr(str, "SAMPLING_FREQ")!=NULL) {
+	  read = fscanf(f_ini, "%f", &WDcfg->Ts); // 1.0=1GHz, 0.4=2.5GHz, 0.2=5GHz
+	  continue;
+	}
 	
         printf("%s: invalid setting\n", str);
 	}

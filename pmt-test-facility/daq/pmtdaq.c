@@ -126,7 +126,7 @@ int GetMoreBoardInfo(int handle, CAEN_DGTZ_BoardInfo_t BoardInfo, WaveDumpConfig
 {
 	CAEN_DGTZ_DRS4Frequency_t freq;
 	int ret;
-    switch(BoardInfo.FamilyCode) {
+	switch(BoardInfo.FamilyCode) {
         case CAEN_DGTZ_XX724_FAMILY_CODE: WDcfg->Nbit = 14; WDcfg->Ts = 10.0; break;
         case CAEN_DGTZ_XX720_FAMILY_CODE: WDcfg->Nbit = 12; WDcfg->Ts = 4.0;  break;
         case CAEN_DGTZ_XX721_FAMILY_CODE: WDcfg->Nbit =  8; WDcfg->Ts = 2.0;  break;
@@ -134,23 +134,26 @@ int GetMoreBoardInfo(int handle, CAEN_DGTZ_BoardInfo_t BoardInfo, WaveDumpConfig
         case CAEN_DGTZ_XX751_FAMILY_CODE: WDcfg->Nbit = 10; WDcfg->Ts = 1.0;  break;
         case CAEN_DGTZ_XX761_FAMILY_CODE: WDcfg->Nbit = 10; WDcfg->Ts = 0.25;  break;
         case CAEN_DGTZ_XX740_FAMILY_CODE: WDcfg->Nbit = 12; WDcfg->Ts = 16.0; break;
-        case CAEN_DGTZ_XX742_FAMILY_CODE: 
-        WDcfg->Nbit = 12; 
-        if ((ret = CAEN_DGTZ_GetDRS4SamplingFrequency(handle, &freq)) != CAEN_DGTZ_Success) return CAEN_DGTZ_CommError;
-		switch (freq) {
-				case CAEN_DGTZ_DRS4_1GHz:
-						WDcfg->Ts = 1.0;
-					break;
-				case CAEN_DGTZ_DRS4_2_5GHz:
-						WDcfg->Ts = (float)0.4;
-					break;
-				case CAEN_DGTZ_DRS4_5GHz:
-						WDcfg->Ts = (float)0.2;
-					break;
-		}
-        break;
-        default: return -1;
-    }
+	case CAEN_DGTZ_XX742_FAMILY_CODE: 
+	  WDcfg->Nbit = 12; 
+	  if (WDcfg->Ts == 0) {
+	    
+	    if ( (ret = CAEN_DGTZ_GetDRS4SamplingFrequency(handle, &freq)) != CAEN_DGTZ_Success) return CAEN_DGTZ_CommError;
+	    switch (freq) {
+	    case CAEN_DGTZ_DRS4_1GHz:
+	      WDcfg->Ts = 1.0;
+	      break;
+	    case CAEN_DGTZ_DRS4_2_5GHz:
+	      WDcfg->Ts = (float)0.4;
+	      break;
+	    case CAEN_DGTZ_DRS4_5GHz:
+	      WDcfg->Ts = (float)0.2;
+	      break;
+	    }
+	  }
+	  break;
+	default: return -1;
+	}
     if (((BoardInfo.FamilyCode == CAEN_DGTZ_XX751_FAMILY_CODE) ||
          (BoardInfo.FamilyCode == CAEN_DGTZ_XX731_FAMILY_CODE) ) && WDcfg->DesMode)
         WDcfg->Ts /= 2;
@@ -228,12 +231,27 @@ int ProgramDigitizer(int handle, WaveDumpConfig_t WDcfg, CAEN_DGTZ_BoardInfo_t B
 
     // Set the waveform test bit for debugging
     if (WDcfg.TestPattern)
-        ret |= CAEN_DGTZ_WriteRegister(handle, CAEN_DGTZ_BROAD_CH_CONFIGBIT_SET_ADD, 1<<3);
-	// custom setting for X742 boards
-	if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {
-		ret |= CAEN_DGTZ_SetFastTriggerDigitizing(handle,WDcfg.FastTriggerEnabled);
-		ret |= CAEN_DGTZ_SetFastTriggerMode(handle,WDcfg.FastTriggerMode);
-	}
+      ret |= CAEN_DGTZ_WriteRegister(handle, CAEN_DGTZ_BROAD_CH_CONFIGBIT_SET_ADD, 1<<3);
+    int drs4nss = 1000*WDcfg.Ts; 
+    // Set the board sampling frequency
+    if ( drs4nss )
+    switch( drs4nss){ // WDcfg.Ts 1.0=1GHz, 0.4=2.5GHz, 0.2=5GHz
+      case 200:
+	ret |= CAEN_DGTZ_WriteRegister(handle,0x80D8, 0 );
+	break;
+      case 400:
+	ret |= CAEN_DGTZ_WriteRegister(handle,0x80D8, 1 );
+	break;
+      case 1000: 
+	ret |= CAEN_DGTZ_WriteRegister(handle,0x80D8, 1<<1 );
+	break;
+      }
+
+    // custom setting for X742 boards
+    if (BoardInfo.FamilyCode == CAEN_DGTZ_XX742_FAMILY_CODE) {
+      ret |= CAEN_DGTZ_SetFastTriggerDigitizing(handle,WDcfg.FastTriggerEnabled);
+      ret |= CAEN_DGTZ_SetFastTriggerMode(handle,WDcfg.FastTriggerMode);
+    }
     if ((BoardInfo.FamilyCode == CAEN_DGTZ_XX751_FAMILY_CODE) || (BoardInfo.FamilyCode == CAEN_DGTZ_XX731_FAMILY_CODE)) {
         ret |= CAEN_DGTZ_SetDESMode(handle, WDcfg.DesMode);
     }
@@ -817,6 +835,20 @@ int main(int argc, char *argv[])
     /* *************************************************************************************** */
     isVMEDevice = WDcfg.BaseAddress ? 1 : 0;
 
+    int drs4freq=0;
+    int drs4nss = 1000*WDcfg.Ts; 
+    switch(drs4nss){
+    case 1000:
+      drs4freq=CAEN_DGTZ_DRS4_1GHz;
+      break;
+    case 400:
+      drs4freq=CAEN_DGTZ_DRS4_2_5GHz;
+      break;
+    case 200:
+      drs4freq=CAEN_DGTZ_DRS4_5GHz;
+      break;
+    }
+
     /* HACK, the function to load the correction table is a CAENComm function, so we first open the
     device with CAENComm lib, read the the correction table and suddenly close the device. */
     if(WDcfg.useCorrections != -1) { // use Corrections Manually
@@ -824,13 +856,11 @@ int main(int argc, char *argv[])
             ErrCode = ERR_DGZ_OPEN;
             goto QuitProgram;
         }
-        
-        if (ret = LoadCorrectionTables(handle, &Table_gr0, 0, CAEN_DGTZ_DRS4_5GHz))
-            goto QuitProgram;
-
-        if (ret = LoadCorrectionTables(handle, &Table_gr1, 1, CAEN_DGTZ_DRS4_5GHz))
-            goto QuitProgram;
-
+	if (ret = LoadCorrectionTables(handle, &Table_gr0, 0, drs4freq))
+	  goto QuitProgram;
+	
+	if (ret = LoadCorrectionTables(handle, &Table_gr1, 1, drs4freq))
+	  goto QuitProgram;
         if (ret = CAENComm_CloseDevice(handle))
             goto QuitProgram;
 
@@ -846,7 +876,7 @@ int main(int argc, char *argv[])
     }
 
 	if( WDcfg.useCorrections == -1 ) { // use automatic corrections
-        ret = CAEN_DGTZ_LoadDRS4CorrectionData(handle,CAEN_DGTZ_DRS4_5GHz);
+        ret = CAEN_DGTZ_LoadDRS4CorrectionData(handle,drs4freq);
         ret = CAEN_DGTZ_EnableDRS4Correction(handle);
     }
     ret = CAEN_DGTZ_GetInfo(handle, &BoardInfo);
@@ -1080,8 +1110,22 @@ InterruptTimeout:
 				else {
 					ret = CAEN_DGTZ_DecodeEvent(handle, EventPtr, (void**)&Event742);
                     if(WDcfg.useCorrections != -1) { // if manual corrections
-					    ApplyDataCorrection( 0, WDcfg.useCorrections, CAEN_DGTZ_DRS4_5GHz, &(Event742->DataGroup[0]), &Table_gr0);
-					    ApplyDataCorrection( 1, WDcfg.useCorrections, CAEN_DGTZ_DRS4_5GHz, &(Event742->DataGroup[1]), &Table_gr1);
+		      int drs4freq=0;
+		      int drs4nss=1000*WDcfg.Ts;
+		      switch(drs4nss){
+		      case 1000:
+			drs4freq=CAEN_DGTZ_DRS4_1GHz;
+			break;
+		      case 400:
+			drs4freq=CAEN_DGTZ_DRS4_2_5GHz;
+			break;
+		      case 200:
+			drs4freq=CAEN_DGTZ_DRS4_5GHz;
+			break;
+		      }
+		      
+					    ApplyDataCorrection( 0, WDcfg.useCorrections, drs4freq, &(Event742->DataGroup[0]), &Table_gr0);
+					    ApplyDataCorrection( 1, WDcfg.useCorrections, drs4freq, &(Event742->DataGroup[1]), &Table_gr1);
                     }
 				}
             if (ret) {

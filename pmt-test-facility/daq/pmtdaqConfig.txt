@@ -12,13 +12,13 @@
 [COMMON]
 
 # total number of evens to run
-EVENTS_TO_WRITE 100000
-#EVENTS_TO_WRITE 10000
+#EVENTS_TO_WRITE 100000
+EVENTS_TO_WRITE 10000
 
 # bit mask of channels to display initially on the plot
 # 0x100 is the mask for TR0
 # 0x0ff is the mask for channels 0->7
-CHANNELS_TO_PLOT 0x102
+CHANNELS_TO_PLOT 0x106
 
 # OPEN: open the digitizer
 # options: USB 0 0      Desktop/NIM digitizer through USB              
@@ -59,6 +59,11 @@ RECORD_LENGTH  1024
 #RECORD_LENGTH  512
 #RECORD_LENGTH  256
 
+# SAMPLING_FREQ = digitizer sampling frequency 1.0 -> 1GHz, 0.4 -> 2.5GHz, 0.2 -> 5GHz
+#SAMPLING_FREQ 0.2
+#SAMPLING_FREQ 0.4
+SAMPLING_FREQ 1
+
 # TEST_PATTERN: if enabled, data from ADC are replaced by test pattern (triangular wave)
 # options: YES, NO
 TEST_PATTERN   NO
@@ -98,7 +103,7 @@ ENABLED_FAST_TRIGGER_DIGITIZING		YES
 #POST_TRIGGER  70
 
 # Stefano
-POST_TRIGGER  60
+POST_TRIGGER  85
 
 #with 512 samples
 #POST_TRIGGER  55
@@ -272,12 +277,12 @@ GROUP_TRG_ENABLE_MASK  00
 # 0V
 
 # use this for TTL 
-DC_OFFSET              32768	
-TRIGGER_THRESHOLD      49152
+# DC_OFFSET              32768	
+#TRIGGER_THRESHOLD      49152
 
 # use this for NIM 
-#DC_OFFSET              32768	
-#TRIGGER_THRESHOLD      20934
+DC_OFFSET              32768	
+TRIGGER_THRESHOLD      20934
 
 # use this for laser
 #TRIGGER_THRESHOLD      31750	

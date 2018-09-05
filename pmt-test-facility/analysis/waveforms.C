@@ -35,7 +35,7 @@ public:
   // Set channel according to input
   void setChannel(const char* fData, 
                   const char *fPed, 
-                  int nPed);
+                  int nPed = 0);
 
   // Load pedestals 
   void loadPedestals(const char* fPed, int nPed = 0);
@@ -301,7 +301,7 @@ void channel::loadPedestals(const char* pedestalfilename, int npedestals){
 	break;
       }
       iline++;
-      if (dummy>pow(2,12) || dummy<0){
+      if (dummy>pow(2,8*sizeof(float)) || dummy<0){
 	cout<<"pedestals: error loading wave "<<nwaves<<", "<<i<<"-th value corrupted: "<<dummy<<endl;
 	continue;
       }
@@ -569,12 +569,12 @@ public:
   TF1* trgFun() { return m_trgFun; }
   
   // Fit signal
-  bool fitSignal(int min = 0, int max = 600);
-  //bool fitSignal(int min = 0, int max = channel::rlength);
+  //bool fitSignal(int min = 0, int max = 600);
+  bool fitSignal(int min = 25, int max = channel::rlength);
 
   // Fit trigger
   //bool fitTrigger(int min = 100, int max = 200); // laser default
-  bool fitTrigger(int min = 100, int max = 300); //diode default
+  bool fitTrigger(int min = 25, int max = 65); //diode default
 
   // Plot channels and go to next event
   void plotNext(string ch = "signal");
@@ -597,9 +597,9 @@ channelWithTrigger::channelWithTrigger(string fDataSig,
                                        string fPedTrg, 
                                        int nPed)
 {
+  //m_sigFun = new TF1("sigFun", multi_sigwavef, 0, channel::rlength, 6);
   m_sigFun = new TF1("sigFun", sigwavef, 0, channel::rlength, 6);
-  m_trgFun = new TF1("trgFun", trgwavef_Gallo, 0, channel::rlength, 5);
-  //m_trgFun = new TF1("trgFun", trgwavef, 0, channel::rlength, 6);
+  m_trgFun = new TF1("trgFun", trgwavef, 0, channel::rlength, 5);
 
   m_sigChannel.setChannel(fDataSig.c_str(), fPedSig.c_str(), nPed);
   m_trgChannel.setChannel(fDataTrg.c_str(), fPedTrg.c_str(), nPed);
@@ -611,22 +611,46 @@ channelWithTrigger::channelWithTrigger(string fDataSig,
 channelWithTrigger::~channelWithTrigger() {}
 
 //======================================================
-// Fit signal
+// Fit signal (multi-waves)
 //======================================================
+//bool channelWithTrigger::fitSignal(int min, int max) 
+//{
+//  m_sigFun->SetRange(min, max);
+//  //m_sigFun->SetParNames("t0", "tau_r", "tau_f", "ped", "norm", "bw");
+// 
+//  const int nFun = 4;
+//
+//  for (int i = 0; i < nFun; i++) {
+//    m_sigFun->SetParLimits(i, 0, channel::rlength); //t0
+//    m_sigFun->SetParLimits(nFun + i, 1., 30.); //tr
+//    m_sigFun->SetParLimits(2*nFun + i, 30., 500.); //tf  
+//
+//    m_sigFun->SetParameter(i, 150 + 40*i);
+//    m_sigFun->SetParameter(nFun + i, 5.);
+//    m_sigFun->SetParameter(2*nFun + i, 100.);
+//  }
+// 
+//  m_sigFun->SetParameter(3*nFun, 0);
+//  m_sigFun->SetParameter(3*nFun + 1, 2e4);
+//  m_sigFun->FixParameter(3*nFun + 2, 1); //bw
+//
+//
+//  return m_sigChannel.fit(m_sigFun, min, max);
+//}
+
 bool channelWithTrigger::fitSignal(int min, int max) 
 {
   m_sigFun->SetRange(min, max);
   m_sigFun->SetParNames("t0", "tau_r", "tau_f", "ped", "norm", "bw");
  
-  m_sigFun->SetParLimits(0, 0, channel::rlength); //t0
-  m_sigFun->SetParLimits(1, 1., 30.); //tr
-  m_sigFun->SetParLimits(2, 30., 500.); //tf  
- 
+  m_sigFun->SetParLimits(0, min, max); //t0
+  m_sigFun->SetParLimits(1, 0.25, 30.); //tr
+  m_sigFun->SetParLimits(2, 10., 500.); //tf  
   m_sigFun->FixParameter(5, 1); //bw
 
-  m_sigFun->SetParameters(150, 5, 100, 0, 2e4, 1); //(t0, tr, tf, ped, norm, bw)
-
-  return m_sigChannel.fit(m_sigFun, min, max);
+  m_sigFun->SetParameters(min, 5, 100, 0, 2e4, 1); //(t0, tr, tf, ped, norm, bw)
+  m_sigChannel.fit(m_sigFun, min, max);
+  return m_sigChannel.fit(m_sigFun, min, m_sigFun->GetParameter("t0") + m_sigFun->GetParameter("tau_f"));
 }
 
 //======================================================
@@ -639,14 +663,14 @@ bool channelWithTrigger::fitTrigger(int min, int max)
   
   // New settings
   m_trgFun->SetParNames("t0", "tau", "ped", "norm", "bw");
-  m_trgFun->SetParLimits(0, 50, 200); //t0
+  m_trgFun->SetParLimits(0, min, max); //t0
   m_trgFun->SetParLimits(1, 0., 50.); //tau
   m_trgFun->SetParLimits(2, -50, 50.); //ped
-  m_trgFun->SetParLimits(3, 1.3e3, 2.e3); //norm
+  m_trgFun->SetParLimits(3, 1e2, 1.e4); //norm
 
   m_trgFun->FixParameter(4, 1); //bw
 
-  m_trgFun->SetParameters(150, 1., 0., 1.4e3, 1); //(t0, tau, ped, norm, bw)
+  m_trgFun->SetParameters(min, 1., 0., 1.4e3, 1); //(t0, tau, ped, norm, bw)
 
   // Old settings
   //m_trgFun->SetParNames("t0", "tau", "tstop", "ped", "norm", "bw");
@@ -790,7 +814,8 @@ void channelWithTrigger::read(int maxEvents)
     hSigTime->Fill(sigTime);
     hTrgTime->Fill(trgTime);
     hTimeDiff->Fill(sigTime - trgTime);
-    hPh->Fill(pulseHeight);
+    //    hPh->Fill(pulseHeight);
+    hPh->Fill(integral);
     hChi2->Fill(chi2);
     hTauRise->Fill(tauRise);
     hTauFall->Fill(tauFall);

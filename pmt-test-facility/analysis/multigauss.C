@@ -194,7 +194,7 @@ void dofit( TString dataFile,
     nEvents = ch.GetEntries();
     hh = new TH1F("hh"," ",150,-50.,800.);
 
-    for (Int_t i = 0; i < nEvents; i++) {
+   for (Int_t i = 0; i < nEvents; i++) {
       ch.GetEvent(i); 
       //if (tauFall < 125.0) continue; // Suppress cross-talk
       hh->Fill(integral);
@@ -322,10 +322,12 @@ RooFitResult* getFit( TH1F *hh,
   //==========================
   // Pattern recognition
   //==========================
-  Double_t x_peaks[2]={0.,200.}; // initial values
   TSpectrum *s = new TSpectrum(4);
-  Int_t npeaks = s->Search(hh,4," ",5e-4); // used to configure the Search 
+  TH1F* hsmooth=(TH1F*)hh->Clone("hsmooth");
+  hsmooth->Smooth();
+  static const Int_t npeaks = s->Search(hh,4," ",5e-4); // used to configure the Search 
   cout << "Found " << npeaks << " candidate peaks !" << endl;
+  Double_t x_peaks[npeaks]; // initial values
   Double_t *xpeaks = s->GetPositionX();
   for (Int_t p=0;p<npeaks;p++) {
     x_peaks[p] = static_cast<Double_t>(xpeaks[p]);
@@ -335,7 +337,7 @@ RooFitResult* getFit( TH1F *hh,
   }
   if( npeaks==1 ){
     cout << "uninitialized peak:" << endl;
-    cout << x_peaks[1] << endl; 
+    cout << x_peaks[0] << endl; 
   }
 
   //***valley with TSpectrum***
@@ -354,8 +356,8 @@ RooFitResult* getFit( TH1F *hh,
   }
   Double_t x_swap[2]={20.,1000.}; // initial values
   TSpectrum *swap = new TSpectrum(2);
-  npeaks = swap->Search(hhswap, 10, "nobackground", 1e-1); // used to configure the Search
-  cout << "Found " << npeaks << " <<swapped>> candidate peaks !" << endl;
+  int npeaks_swap = swap->Search(hhswap, 10, "nobackground", 1e-1); // used to configure the Search
+  cout << "Found " << npeaks_swap << " <<swapped>> candidate peaks !" << endl;
   Double_t *xswap = swap->GetPositionX();
   for (Int_t ps=0;ps<2;ps++) {
     x_swap[ps] = static_cast<Double_t>(xswap[ps]);
