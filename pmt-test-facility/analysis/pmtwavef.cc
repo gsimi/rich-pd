@@ -27,20 +27,22 @@ Double_t sigwavef(Double_t* x, Double_t* par) {
 // Fit function for signal wave (multi-signals)
 //===============================================
 Double_t multi_sigwavef(Double_t* x, Double_t* par) {
-  const int nFun = 4;
   double t=*x;
-  double pedestal = par[3*nFun]; 
-  double norm = par[3*nFun + 1]; 
-  double binw = par[3*nFun + 2]; 
+
+  int n_peaks = par[0];
+  double binw = par[1];
+  double pedestal = par[2];
 
   double fun = 0.;
-  for (int i = 0; i < nFun; i++) {
-    double t0 = par[i];
-    double tau1 = par[nFun + i];
-    double tau2 = par[2*nFun + i];
-    double tmp = t<t0 ? pedestal : pedestal +
-           norm*binw*(1+tau1/tau2)/tau2*(1-exp(-(t-t0)/tau1))*exp(-(t-t0)/tau2);
-    fun += tmp;
+
+  for (int i = 0; i < n_peaks; i++) {
+    double t0 = par[3 + i*n_peak_par];
+    double tau1 = par[4 + i*n_peak_par];
+    double tau2 = par[5 + i*n_peak_par];
+    double norm = par[6 + i*n_peak_par];
+
+    double p[6] = {t0, tau1, tau2, pedestal, norm, binw};
+    fun += sigwavef(x, p);
   }
   
   return fun;
